@@ -1,0 +1,1902 @@
+#
+# This is the server logic of a Shiny web application.
+# You can run the
+# application by clicking 'Run App' above.
+#
+# Find out more about building applications with Shiny here:
+#
+#    http://shiny.rstudio.com/
+#
+
+library(shiny)
+library(shinyBS)
+library(shinydashboard)
+library(hrbrthemes)
+library(plotly)
+library(ggplot2)
+library(lubridate)
+library(stringi)
+library(RColorBrewer)
+
+
+# Define server logic required to draw a histogram
+server <- shinyServer(function(input,output,session) {
+
+   message_df <- data.frame()
+# TAB.1 -------------------------------------------------------------------
+
+    output$plot1 <- renderPlotly({
+      plotly::ggplotly(trustee_contributions_GG,tooltip="text")
+      })
+    
+    output$total_contributions <- renderInfoBox({
+      sum(active_trustee$`Net Signed Condribution in USD`) %>%
+      dollar() %>% 
+      infoBox(
+        "Total Pledged Amount", ., icon = icon("money-check-alt"),
+        color = "blue", subtitle = "* across all active trustees")
+      })
+    
+    output$total_received <- renderInfoBox({
+      sum(active_trustee$`Net Paid-In Condribution in USD`) %>% 
+      dollar() %>% 
+      infoBox(
+        "Total Contributions Received", ., icon = icon("hand-holding-usd"),
+        color = "blue", subtitle = "* across all active trustees")
+      
+      })
+    
+    output$total_unpaid <- renderInfoBox({
+      sum(active_trustee$`Net Unpaid contribution in USD`) %>% 
+      dollar()%>% 
+        infoBox(
+          "Total Pending (Un-paid)", ., icon = icon("file-invoice-dollar"),
+          color = "blue", subtitle = "* across all active trustees")
+      
+      })
+    
+    output$total_remaining_balance <- renderInfoBox({
+      
+     temp_grants <- grants %>% filter(Trustee %in% active_trustee$Fund,
+                                      `Fund Status`=="ACTV")
+      sum(temp_grants$unnacounted_amount) %>% 
+      dollar()%>% 
+        infoBox(
+          "Total Remaining Balance", ., icon = icon("receipt"),
+          color = "blue", subtitle = "* across all active grants")
+      })
+    
+    output$`closing<12` <- renderInfoBox({
+      
+        active_trustee %>%
+        filter(months_to_end_disbursement<=12) %>% nrow() %>% 
+        infoBox(
+          "Trustees with < 12 months to disburse",
+          .,
+          icon = icon("stopwatch"),
+          color = "orange")
+    })
+    
+    output$`closing<6` <- renderInfoBox({
+      active_trustee %>%
+        filter(months_to_end_disbursement<=6) %>% nrow() %>% 
+        infoBox(
+          "Trustees with < 6 months to disburse",
+          .,
+          icon = icon("stopwatch"),
+          color = "red")
+    })
+    
+    output$all_grants_amount <- renderInfoBox({
+    
+      temp_grants <- grants %>% filter(Trustee %in% active_trustee$Trustee)
+      sum(temp_grants$`Grant Amount USD`) %>% dollar() %>% 
+        infoBox(
+          "Amount awarded in grants",
+          .,
+          icon = icon("stopwatch"),
+          color = "red",
+          subtitle = "* All grants")
+    })
+    
+    output$overview_progress_GG <- renderPlotly({
+      
+      temp_df <- grants %>% filter(`Fund Status`=="ACTV")
+      
+      new_df <- data.frame(Disbursed=sum(temp_df$`Disbursements USD`),
+                           Committed=sum(temp_df$`Commitments USD`),
+                           "Remaining"=sum(temp_df$unnacounted_amount)) %>% 
+        reshape2::melt() %>%
+        mutate(total=sum(temp_df$`Grant Amount USD`)) %>%
+        mutate(percent=value/total)
+      
+      gg <- new_df %>% ggplot(aes(x=total,
+                                  y=value,
+                                  fill=variable,
+                                  label=percent(percent),
+                                  text=paste(variable,"\n",
+                                             "USD Amount:",dollar(value),"\n",
+                                             "Percentage of Total:",percent(percent)))) +
+        geom_bar(stat='identity',position = 'stack') +
+        # coord_flip() +
+        theme_minimal() +
+        labs(y="USD Amount")+
+        theme(axis.title.y = element_blank(),
+              axis.text.y = element_blank(),
+              axis.ticks.y = element_blank(),
+              panel.background = element_blank(),
+              panel.grid = element_blank(),
+              axis.text.x = element_blank(),
+              axis.ticks.x = element_blank()) +
+        theme(#legend.direction = "horizontal",
+          legend.position = 'bottom',
+          legend.title = element_blank(),
+          axis.title.x = element_blank(),
+          plot.margin = unit(c(0,0,0,0), "cm")) +
+        coord_flip() +
+        scale_fill_discrete(breaks=c("Remaining","Committed","Disbursed")) +
+        scale_fill_brewer(palette = "Blues") +
+        geom_text(size = 3, position = position_stack(vjust = 0.5),) 
+      
+      plotly::ggplotly(gg, tooltip = "text") %>%
+        layout(legend = list(orientation = 'h',
+                             font = list(size = 10),
+                             x=.2, y = -4,
+                             traceorder="reversed"))
+      
+    })
+    
+    output$number_active_grants <- renderValueBox({
+      
+      temp_grants <- grants %>%
+        filter(`Fund Status` == "ACTV") %>% select(Fund) %>% 
+        distinct() %>% nrow() %>% 
+        valueBox(.,
+          subtitle = "Active Grants",
+          icon = icon("list-ol"),
+          color = "green")
+    })
+  
+    
+    output$region_GP_GG <- renderPlotly({
+      
+      remove_num <- function(x){
+        word <- x
+        letter <- stri_sub(x,5)
+        if(letter %in% c("1","2","3","4","5","6","7","8","9")){
+          return(stri_sub(x,1,4))} else{
+            return(stri_sub(word))
+          }
+      }
+      
+      temp_df <- grants %>% filter(`Fund Status`=="ACTV")
+      
+      temp_df$aggregate_unit <- sapply(temp_df$`TTL Unit Name`, function(x) remove_num(x)) %>% as.vector()
+      data <- temp_df %>% 
+        group_by(`aggregate_unit`) %>% 
+        summarise(n_grants = n(), total_award_amount = sum(`Grant Amount USD`))
+      
+      plot_ly(data, labels = ~aggregate_unit, values = ~total_award_amount, type = 'pie') %>%
+        layout(xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+               yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE))
+      
+      
+    })
+    
+    
+    output$n_grants_region <- renderPlotly({
+      
+      temp_df <- grants %>% filter(`Fund Status`=="ACTV")
+      gg <- temp_df %>% 
+        group_by(Region) %>%
+        summarise(n_grants = n(), total_award_amount = sum(`Grant Amount USD`)) %>%
+        ggplot(aes(x=reorder(Region,n_grants),y=n_grants,fill=Region,
+                   text=paste(Region,
+                              "\n",
+                              "Number of Grants:",
+                              n_grants,
+                              "\n",
+                              "Total Awards Amount:",
+                              dollar(total_award_amount)))) +
+        geom_col(fill='royalblue',alpha=.7) +
+        theme_classic() +
+        labs(x="Region", y="Number of Grants")+
+        theme(rect = element_rect(fill="transparent"),
+              plot.background = element_rect(fill="transparent",color=NA),
+              panel.background = element_rect(fill="transparent")) 
+      
+      plotly::ggplotly(gg, tooltip = "text")
+      
+    })
+  
+    
+    output$funding_region <- renderPlotly({
+      
+      temp_df <- grants %>% filter(`Fund Status`=="ACTV")
+      data <- temp_df %>% 
+        group_by(Region) %>% 
+        summarise(n_grants = n(), total_award_amount = sum(`Grant Amount USD`))
+      
+      plot_ly(data, labels = ~Region, values = ~total_award_amount, type = 'pie') %>%
+        layout(xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+               yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE))
+    })
+    
+    output$funding_GP <- renderPlotly({
+      
+      remove_num <- function(x){
+        word <- x
+        letter <- stri_sub(x,5)
+        if(letter %in% c("1","2","3","4","5","6","7","8","9")){
+          return(stri_sub(x,1,4))} else{
+            return(stri_sub(word))
+          }
+      }
+      
+      temp_df <- grants %>% filter(`Fund Status`=="ACTV")
+      
+      temp_df$aggregate_unit <- sapply(temp_df$`TTL Unit Name`, function(x) remove_num(x)) %>% as.vector()
+      data <- temp_df %>% 
+        group_by(`aggregate_unit`) %>% 
+        summarise(n_grants = n(), total_award_amount = sum(`Grant Amount USD`))
+      
+      plot_ly(data, labels = ~aggregate_unit, values = ~total_award_amount, type = 'pie') %>%
+        layout(xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+               yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE))
+      
+      
+    })
+    
+    
+    
+# TAB.1.3 -------------
+    output$trustee_name_TTL <- renderTable({
+      active_trustee  %>% 
+        select(Fund,`Fund Name`,`Fund TTL Name`,`TF End Disb Date`) %>% 
+        mutate(`TF End Disb Date`= as.character(as_date(`TF End Disb Date`)))
+    },striped = T)
+    
+    
+    output$donor_contributions <- renderTable({
+      active_trustee %>% group_by(`Donor Name`,`Donor Agency Name`) %>%
+        summarise("Total Signed Contributions"=sum(`Net Signed Condribution in USD`) %>% dollar(),
+                  "Total Received Contributions"=sum(`Net Paid-In Condribution in USD`) %>% dollar(),
+                  "Total Pending Contributions"=sum(`Net Unpaid contribution in USD`) %>% dollar())
+    },striped = T)
+    
+    
+    output$donor_contributions_GG <- renderPlotly({
+      signed_df <- active_trustee %>% filter(`Net Signed Condribution in USD`>0) %>%
+        group_by(`Donor Name`) %>%
+        summarise("Total Signed Contributions"=sum(`Net Signed Condribution in USD`))
+      
+      active_trustee$`Donor Agency Name`[active_trustee$`Donor Name`=="Multi Donor"] <- "Multiple Donors"
+    gg <-  active_trustee %>% filter(`Net Signed Condribution in USD`>0) %>%
+        group_by(`Donor Name`,`Donor Agency Name`) %>%
+        summarise(#"Total Signed Contributions"=sum(`Net Signed Condribution in USD`),
+                  "Total Pending Contributions"=sum(`Net Unpaid contribution in USD`),
+                  "Total Received Contributions"=sum(`Net Paid-In Condribution in USD`)) %>% 
+        reshape2::melt() %>% full_join(.,signed_df,by='Donor Name') %>% 
+    
+      ggplot(aes(x=`Donor Name`,y=value,fill=variable,
+                   text=paste(`Donor Agency Name`,"\n",
+                              "Total Signed:", dollar(`Total Signed Contributions`),"\n",
+                              variable,":",dollar(value)))) +
+          geom_bar(stat='identity') +
+        theme_classic() +
+        scale_y_continuous(labels=dollar_format(prefix="$")) +
+        scale_fill_discrete(name = "Contributions", labels = c("Pending", "Received")) +
+        labs(y="USD Amount", title="Contributions by Donor Agency") +
+      theme(rect = element_rect(fill="transparent"),
+            plot.background = element_rect(fill="transparent",color=NA),
+            panel.background = element_rect(fill="transparent")) 
+      
+      plotly::ggplotly(gg, tooltip='text')
+    })
+  
+    
+    output$RETF_n_grants_A <- renderValueBox({
+      
+      temp_df <- grants %>% filter(`DF Execution Type`=="RE")
+      temp_df %>% nrow() %>%
+        valueBox(value=.,
+                 subtitle =HTML("<b>Active RETF grants</b> <button id=\"show_grants_RETF_A\" type=\"button\" class=\"btn btn-default action-button\">Show Grants</button>"),
+                 color="blue")
+      
+    })
+    
+    
+    observeEvent(input$show_grants_RETF_A, {
+      data <- grants %>% filter(`DF Execution Type`=="RE")
+      isolate(data <- data %>% filter(`Grant Amount USD` != 0) %>%
+                select(Fund,
+                       `Fund Name`,
+                       `Grant Amount USD`,
+                       temp.name,
+                       `Fund TTL Name`,
+                       `TTL Unit Name`,
+                       tf_age_months,
+                       months_to_end_disbursement) %>%
+                arrange(-tf_age_months) %>%
+                mutate(`Grant Amount USD` = dollar(`Grant Amount USD`)) %>%
+                rename("Months Left to Disburse" = months_to_end_disbursement,
+                       "Months Since Grant Activation"= tf_age_months,
+                       "Trustee"= temp.name))
+      
+      showModal(modalDialog(size = 'l',
+                            title = "BETF grants",
+                            renderTable(data),
+                            easyClose = TRUE))
+      
+    })
+    
+    output$`RETF_$_grants_A` <- renderValueBox({
+      
+      temp_df <- grants %>% filter(`DF Execution Type`=="RE")
+      sum(temp_df$`Grant Amount USD`) %>% dollar() %>% 
+        valueBox(value=.,
+                 subtitle = "Active RETF funds amount",
+                 color="blue")
+      
+    })
+    
+    
+    output$RETF_trustees_A_pie <- renderPlotly({
+      
+      remove_num <- function(x){
+        word <- x
+        letter <- stri_sub(x,5)
+        if(letter %in% c("1","2","3","4","5","6","7","8","9")){
+          return(stri_sub(x,1,4))} else{
+            return(stri_sub(word))
+          }
+      }
+      
+      temp_df <- grants %>% filter(`DF Execution Type`=="RE")
+      
+      temp_df$aggregate_unit <- sapply(temp_df$`TTL Unit Name`, function(x) remove_num(x)) %>% as.vector()
+      data <- temp_df %>% 
+        group_by(`aggregate_unit`) %>% 
+        summarise(n_grants = n(), total_award_amount = sum(`Grant Amount USD`))
+      
+      plot_ly(data, labels = ~aggregate_unit, values = ~total_award_amount, type = 'pie') %>%
+        layout(xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+               yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE))
+      
+      
+    })
+    
+    output$RETF_region_A_pie <- renderPlotly({
+      
+      temp_df <- grants %>% filter(`DF Execution Type`=="RE")
+      
+      data <- temp_df %>% 
+        group_by(Region) %>% 
+        summarise(n_grants = n(), total_award_amount = sum(`Grant Amount USD`))
+      
+      plot_ly(data, labels = ~Region, values = ~total_award_amount, type = 'pie') %>%
+        layout(xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+               yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE))
+      
+      
+    })
+    
+    
+  
+
+# TAB.2 -------------------------------------------------------------------
+
+    reactive_active_trustee <- reactive({
+      
+      #input$focal_select_region
+      active_trustee %>%
+        filter( temp.name == input$select_trustee)
+    })
+    
+    reactive_grants_trustee <- reactive({
+      grants %>%
+        filter(temp.name == input$select_trustee,
+               `Fund Status`== "ACTV") %>% 
+        filter(Region %in% input$trustee_select_region)
+      
+    })
+    
+    observeEvent(input$select_trustee, {
+      #subset the data by trustee selected
+      temp_grants <- grants %>% filter(temp.name == input$select_trustee)
+      temp_active_trustee <- active_trustee %>% filter(temp.name==input$select_trustee)
+      
+      updateSelectInput(session, "trustee_select_region",
+                        label = 'Selected Regions',
+                        choices = sort(unique(temp_grants$Region)),
+                        selected = unique(temp_grants$Region))
+      
+      output$trustee_contribution_agency <- renderText({
+        temp_active_trustee$`Donor Agency Name`
+      })
+      
+      
+      output$TTL_name <- renderText({
+        
+        temp_active_trustee$`Fund TTL Name`[1]
+      })
+      
+      output$trustee_name <- renderText({
+        temp_active_trustee$`Fund Name`
+      })
+    })
+  
+      output$fund_contributions <- renderInfoBox({
+        
+        temp_active_trustee <- reactive_active_trustee()
+        sum(temp_active_trustee$`Net Signed Condribution in USD`) %>% dollar %>% 
+          infoBox("Fund Size",value=.)
+      })
+      
+      output$trustee_received <- renderInfoBox({
+        temp_active_trustee <- reactive_active_trustee()
+        received <- sum(temp_active_trustee$`Net Paid-In Condribution in USD`) %>% dollar
+        
+        percent <- round(sum(temp_active_trustee$`Net Paid-In Condribution in USD`)*100/
+          sum(temp_active_trustee$`Net Signed Condribution in USD`),digits = 1)
+        
+        display <- paste0(received," (",percent,"%)")
+          infoBox("Funds received to date by Donor",value= display)
+      })
+      
+      output$trustee_unpaid <- renderInfoBox({
+        
+        temp_active_trustee <- reactive_active_trustee()
+        unpaid <- sum(temp_active_trustee$`Net Unpaid contribution in USD`) %>% dollar
+         
+        
+        percent <- round(sum(temp_active_trustee$`Net Unpaid contribution in USD`)*100/
+                             sum(temp_active_trustee$`Net Signed Condribution in USD`),digits = 1)
+          
+        display <- paste0(unpaid," (",percent,"%)")
+        
+        infoBox("Unpaid Contribution Amount",value=display)
+      })
+    
+      output$trustee_grants_amounts <- renderInfoBox({
+        
+        temp_grants <- reactive_grants_trustee()
+        sum(temp_grants$`Grant Amount USD`) %>% dollar %>% 
+          infoBox("Total Awarded Amount",value=.)
+      })
+      
+      output$trustee_dis_GG <- renderPlotly({
+      
+        temp_df <- reactive_grants_trustee()
+        
+        new_df <- data.frame(Disbursed=sum(temp_df$`Disbursements USD`),
+                             Committed=sum(temp_df$`Commitments USD`),
+                             "Remaining"=sum(temp_df$unnacounted_amount)) %>% 
+          reshape2::melt() %>%
+          mutate(total=sum(temp_df$`Grant Amount USD`)) %>%
+          mutate(percent=value/total)
+        
+        gg <- new_df %>% ggplot(aes(x=total,
+                                    y=value,
+                                    fill=variable,
+                                    label=percent(percent),
+                                    text=paste(variable,"\n",
+                                               "USD Amount:",dollar(value),"\n",
+                                               "Percentage of Total:",percent(percent)))) +
+          geom_bar(stat='identity',position = 'stack') +
+          # coord_flip() +
+          theme_minimal() +
+          labs(y="USD Amount")+
+          theme(axis.title.y = element_blank(),
+                axis.text.y = element_blank(),
+                axis.ticks.y = element_blank(),
+                panel.background = element_blank(),
+                panel.grid = element_blank(),
+                axis.text.x = element_blank(),
+                axis.ticks.x = element_blank()) +
+          theme(#legend.direction = "horizontal",
+            legend.position = 'bottom',
+            legend.title = element_blank(),
+            axis.title.x = element_blank(),
+            plot.margin = unit(c(0,0,0,0), "cm")) +
+          coord_flip() +
+          scale_fill_discrete(breaks=c("Remaining","Committed","Disbursed")) +
+          scale_fill_brewer(palette = "Blues") +
+          geom_text(size = 3, position = position_stack(vjust = 0.5),) 
+        
+        plotly::ggplotly(gg, tooltip = "text") %>%
+          layout(legend = list(orientation = 'h',
+                               font = list(size = 10),
+                               x=.2, y = -4,
+                               traceorder="reversed"))
+        
+        
+      })
+    
+      output$trustee_active_grants <- renderValueBox({
+        temp_grants <- reactive_grants_trustee()
+        temp_grants %>% select(Fund)%>% dplyr::distinct() %>% nrow() %>% 
+          valueBox(subtitle = HTML("<b>Number of Active Grants</b> <button id=\"show_active_grants_trustee\" type=\"button\" class=\"btn btn-default action-button\">Show Grants</button>"),
+                   value=.,
+                   width=NULL)
+      })
+      
+      
+      
+      observeEvent(input$show_active_grants_trustee, {
+        temp_grants <- reactive_grants_trustee()
+        
+        isolate(data <- temp_grants %>%
+                  select(Trustee,
+                         Fund,
+                         `Fund Name`,`Fund TTL Name`,`Grant Amount USD`,
+                         unnacounted_amount,months_to_end_disbursement) %>% 
+                  mutate(`Grant Amount USD`=dollar(`Grant Amount USD`),
+                         unnacounted_amount=dollar(unnacounted_amount)) %>% 
+                  rename("Remaining Balance"=unnacounted_amount,
+                         "Child Fund"=Fund,
+                         "TTL Name"=`Fund TTL Name`,
+                         "Months to Closing Date"=months_to_end_disbursement)
+                )
+                  
+        showModal(modalDialog(size = 'l',
+                              title = "Active Grants",
+                              renderTable(data),
+                              easyClose = TRUE))
+        
+      })
+      
+      output$trustee_grants_closing_6 <- renderValueBox({
+        
+        temp_grants <- reactive_grants_trustee()
+        temp_grants %>%
+          filter(months_to_end_disbursement <= 6) %>% nrow() %>% 
+          valueBox(subtitle = HTML("<b>Grants closing in less than 6 months</b> <button id=\"show_grants_closing_6\" type=\"button\" class=\"btn btn-default action-button\">Show Grants</button>"),
+                                   value=.,
+                                   width=NULL,
+                   color = 'orange')
+        
+      })
+      
+      
+      observeEvent(input$show_grants_closing_6, {
+        temp_grants <- reactive_grants_trustee()
+        
+        isolate(data <- temp_grants %>% filter(`Fund Status` == "ACTV", `Grant Amount USD` != 0) %>%
+                  filter(months_to_end_disbursement <= 6) %>%
+                  select(Fund,
+                         `Fund Name`,
+                         `Fund TTL Name`,
+                         `Grant Amount USD`,
+                         percent_unaccounted,
+                         months_to_end_disbursement,
+                         Region) %>%
+                  arrange(-percent_unaccounted) %>% 
+                  mutate(percent_unaccounted = percent((percent_unaccounted/100)),
+                         `Grant Amount USD` = dollar(`Grant Amount USD`)) %>% 
+                  rename("Months Left to Disburse" = months_to_end_disbursement,
+                         "Remaining Bal. Percentage of Total" = percent_unaccounted)
+        )
+        
+        showModal(modalDialog(size = 'l',
+                              title = "Active Grants",
+                              renderTable(data),
+                              easyClose = TRUE))
+        
+      })
+      
+      
+      output$trustee_closing_in_months <- renderInfoBox({
+        temp_active_trustee <- reactive_active_trustee()
+        temp_active_trustee$months_to_end_disbursement %>% 
+          infoBox("Months until fund closing date:",value=.,icon = icon("stopwatch"))
+      })
+      
+      output$trustee_region_n_grants_GG <- renderPlotly({
+        
+        temp_df <- reactive_grants_trustee()
+        gg <- temp_df %>% 
+          group_by(Region) %>%
+          summarise(n_grants = n(), total_award_amount = sum(`Grant Amount USD`)) %>%
+          ggplot(aes(x=reorder(Region,n_grants),y=n_grants,
+                     text=paste(Region,
+                                "\n",
+                                "Number of Grants:",
+                                n_grants,
+                                "\n",
+                                "Total Awards Amount:",
+                                dollar(total_award_amount)))) +
+          geom_col(fill='royalblue') +
+          theme_classic() +
+          labs(x="Region", y="Number of Grants")+
+          theme(rect = element_rect(fill="transparent"),
+                plot.background = element_rect(fill="transparent",color=NA),
+                panel.background = element_rect(fill="transparent")) 
+        
+        plotly::ggplotly(gg, tooltip = "text")
+        
+      })
+      
+      output$trustee_region_GG <- renderPlotly({
+        
+        temp_df <- reactive_grants_trustee()
+        gg <- temp_df %>% 
+          group_by(Region) %>%
+          summarise(n_grants = n(),
+                    total_award_amount = sum(`Grant Amount USD`),
+                    total_remaining_balance=sum(unnacounted_amount)) %>%
+          ggplot(aes(x=reorder(Region,total_award_amount),y=total_award_amount,
+                     text=paste(Region,
+                                "\n",
+                                "Number of Grants:",
+                                n_grants,
+                                "\n",
+                                "Total Active Awards Amount:",
+                                dollar(total_award_amount),"\n",
+                                "Total Remaining Balance:",dollar(total_remaining_balance)))) +
+          geom_col(fill='royalblue') +
+          theme_classic() +
+          labs(x="Region", y="Total USD amount in active grants")+
+          theme(rect = element_rect(fill="transparent"),
+                plot.background = element_rect(fill="transparent",color=NA),
+                panel.background = element_rect(fill="transparent")) +
+          scale_y_continuous(labels=dollar_format(prefix="$"))
+        
+        plotly::ggplotly(gg, tooltip = "text")
+        
+      })
+      
+      output$trustee_countries_DT <- DT::renderDataTable({
+        
+        temp_df <- reactive_grants_trustee()
+        temp_df <- temp_df %>%
+          group_by(Country) %>%
+          summarise("Number of Active Grants" = n(),
+                    "Total Active Grants Amount" = dollar(sum(`Grant Amount USD`)),
+                    "Percent Available" = percent((sum(unnacounted_amount))/sum(`Grant Amount USD`),accuracy=1),
+                    "Avg. Monthly Disbursement Rate" = percent(mean(monthly_disbursement_rate),accuracy = 1))
+        
+        DT::datatable(temp_df,options = list(
+          "pageLength" = 15))
+      })
+    
+# TAB.3 REGIONS VIEW -------------------------------------------------------------------
+    
+    # temp.grants <- grants %>% filter(Region==input$focal_select_region,
+                                # `Fund Status`=="ACTV"
+    
+    reactive_df <- reactive({
+      
+      #input$focal_select_region
+      grants %>%
+          filter(Region==input$focal_select_region,
+                 `Fund Status`=="ACTV") %>% 
+          filter(temp.name %in% input$focal_select_trustee) %>% 
+        filter(`DF Execution Type` %in% input$region_BE_RE)
+    })
+      
+      reactive_df_2 <- reactive({
+        
+        #input$focal_select_region
+        grants %>%
+          filter(Region==input$focal_select_region,
+                 `Fund Status`=="ACTV") %>% 
+          filter(temp.name %in% input$focal_select_trustee) %>% 
+          filter(`DF Execution Type` =="RE")
+      })
+    
+    data <- reactiveValues(focal_grants = grants, percent_df= NA, region_grants=grants)
+  
+     observeEvent(input$focal_select_region,{
+     data$region_grants <- grants %>%
+       filter(Region==input$focal_select_region,
+              `Fund Status`=="ACTV") 
+    
+        updateSelectInput(session, "focal_select_trustee",label = 'Selected Trustee(s)',
+                       choices = sort(unique(data$region_grants$temp.name)),
+                       selected = unique(data$region_grants$temp.name))
+    
+    temp.df <- reactive_df()
+    data$percent_df <- temp.df %>%
+      select(`Disbursements USD`,`Grant Amount USD`) %>%
+      summarise(total_dis = sum(`Disbursements USD`),
+                total_awarded=sum(`Grant Amount USD`))
+
+    updateProgressBar(session = session,
+                      id = 'focal_percent_active_disbursed',
+                      value = data$percent_df$total_dis[[1]],
+                      total = data$percent_df$total_awarded[[1]],status = 'info')
+
+   })
+
+
+    observeEvent(input$focal_select_trustee,{
+
+      if (!is.null(input$focal_select_trustee)){
+      temp.df <- reactive_df()
+      data$focal_grants <- reactive_df()
+
+      data$percent_df <- temp.df %>%
+        select(`Disbursements USD`,`Grant Amount USD`) %>%
+        summarise(total_dis = sum(`Disbursements USD`),
+                  total_awarded=sum(`Grant Amount USD`))
+
+      updateProgressBar(session = session,
+                        id = 'focal_percent_active_disbursed',
+                        value = data$percent_df$total_dis[[1]],
+                        total = data$percent_df$total_awarded[[1]],
+                        status = 'info') }
+
+      attention_needed <- data$focal_grants  %>%
+        filter(percent_unaccounted >=35,
+               months_to_end_disbursement<=6) %>%
+        nrow()
+
+      if(attention_needed>0){
+
+        message_list <- paste(attention_needed,
+                           "Grant(s) are closing in less than 6 months and more than 35% uncommitted balance")
+
+        output$notifications_Menu <- renderMenu({
+          dropdownMenu(type ="notifications", notificationItem(text=message_list))
+        })
+      } else {output$notifications_Menu <- NULL }
+      
+    })
+
+    #   #subset the data by trustee selected
+      
+    # #Display name of selected Region
+      output$focal_region_name <- renderText({
+        
+        data <- reactive_df()
+        data$`Fund Country Region Name`[1]})
+  
+      output$focal_active_grants <- renderInfoBox({
+        
+        data <- reactive_df()
+        data %>% nrow() %>%
+        infoBox(title = "Number of Active Grants",
+                value = . ,
+                color = 'green',
+                icon=icon("list-ol"))
+
+      })
+
+
+      output$focal_active_funds <- renderInfoBox({
+        temp_df <- reactive_df()
+        
+       temp_df %>% filter(`Fund Status`=="ACTV") %>%
+          select(`Grant Amount USD`) %>%
+          summarise(sum(`Grant Amount USD`)) %>% as.numeric %>% dollar() %>%
+          infoBox(title = "Total Active Awards",value = . , color = 'green')
+      })
+      
+      
+      
+      
+      
+      output$region_remaining_committed_disbursed <- renderPlotly({
+        
+        temp_df <- reactive_df()
+        
+        new_df <- data.frame(Disbursed=sum(temp_df$`Disbursements USD`),
+                             Committed=sum(temp_df$`Commitments USD`),
+                             "Remaining"=sum(temp_df$unnacounted_amount)) %>% 
+          reshape2::melt() %>%
+          mutate(total=sum(temp_df$`Grant Amount USD`)) %>%
+          mutate(percent=value/total)
+        
+        gg <- new_df %>% ggplot(aes(x=total,
+                                    y=value,
+                                    fill=variable,
+                                    label=percent(percent),
+                                    text=paste(variable,"\n",
+                                               "USD Amount:",dollar(value),"\n",
+                                               "Percentage of Total:",percent(percent)))) +
+          geom_bar(stat='identity',position = 'stack') +
+          # coord_flip() +
+          theme_minimal() +
+          labs(y="USD Amount")+
+          theme(axis.title.y = element_blank(),
+                axis.text.y = element_blank(),
+                axis.ticks.y = element_blank(),
+                panel.background = element_blank(),
+                panel.grid = element_blank(),
+                axis.text.x = element_blank(),
+                axis.ticks.x = element_blank()) +
+          theme(#legend.direction = "horizontal",
+           legend.position = 'bottom',
+            legend.title = element_blank(),
+            axis.title.x = element_blank(),
+            plot.margin = unit(c(0,0,0,0), "cm")) +
+          coord_flip() +
+          scale_fill_discrete(breaks=c("Remaining","Committed","Disbursed")) +
+          scale_fill_brewer(palette = "Blues") +
+          geom_text(size = 3, position = position_stack(vjust = 0.5),) 
+        
+        plotly::ggplotly(gg, tooltip = "text") %>%
+          layout(legend = list(orientation = 'h',
+                               font = list(size = 10),
+                               x=.2, y = -4,
+                               traceorder="reversed"))
+      
+      })
+
+
+      output$focal_region_n_grants_GG <- renderPlotly({
+        
+        temp_df <- reactive_df() 
+        gg <- temp_df %>% 
+          group_by(temp.name) %>%
+          summarise(n_grants = n(), total_award_amount = sum(`Grant Amount USD`)) %>%
+          ggplot(aes(x=reorder(temp.name,n_grants),y=n_grants,
+                     text=paste(temp.name,
+                                "\n",
+                                "Number of Grants:",
+                                n_grants,
+                                "\n",
+                                "Total Awards Amount:",
+                                dollar(total_award_amount)))) +
+          geom_col(fill='royalblue') +
+          theme_classic() +
+          coord_flip() +
+          labs(x="Trustee Name", y="Number of Grants")+
+          theme(rect = element_rect(fill="transparent"),
+                plot.background = element_rect(fill="transparent",color=NA),
+                panel.background = element_rect(fill="transparent")) 
+
+       plotly::ggplotly(gg, tooltip = "text")
+
+      })
+      
+      output$region_GP_GG <- renderPlotly({
+        
+        remove_num <- function(x){
+          word <- x
+          letter <- stri_sub(x,5)
+          if(letter %in% c("1","2","3","4","5","6","7","8","9")){
+            return(stri_sub(x,1,4))} else{
+              return(stri_sub(word))
+            }
+        }
+      
+        temp_df <- reactive_df() 
+        
+        temp_df$aggregate_unit <- sapply(temp_df$`TTL Unit Name`, function(x) remove_num(x)) %>% as.vector()
+         data <- temp_df %>% 
+          group_by(`aggregate_unit`) %>% 
+          summarise(n_grants = n(), total_award_amount = sum(`Grant Amount USD`))
+  
+       plot_ly(data, labels = ~aggregate_unit, values = ~total_award_amount, type = 'pie') %>%
+          layout(xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+                 yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE))
+        
+        
+      })
+      
+      output$region_countries_grants_table <- DT::renderDataTable({
+        
+        temp_df <- reactive_df()
+        temp_df <- temp_df %>%
+          group_by(Country) %>%
+          summarise("Number of Active Grants" = n(),
+                    "Total Active Grants Amount" = dollar(sum(`Grant Amount USD`)),
+                    "Percent Available" = percent((sum(unnacounted_amount))/sum(`Grant Amount USD`),accuracy=1),
+                    "Avg. Monthly Disbursement Rate" = percent(mean(monthly_disbursement_rate),accuracy = 1))
+        
+        DT::datatable(temp_df,options = list(
+          "pageLength" = 15))
+      })
+
+      output$focal_grants_active_3_zero_dis <- renderValueBox({
+        
+        temp_df <- reactive_df()
+        
+        temp_df %>% filter(tf_age_months >= 3,
+                           percent_unaccounted==100) %>%
+          nrow() %>%
+          valueBox(value = .,
+                   subtitle = HTML("<b>Grants aged >= 3 months with no disbursements/committments</b> <button id=\"show_region_grants_no_discom\" type=\"button\" class=\"btn btn-default action-button\">Show Grants</button>"))
+
+      })
+
+      output$focal_grants_closing_3 <- renderValueBox({
+        
+        temp_df <- reactive_df()
+        temp_df %>% filter(months_to_end_disbursement >= 3) %>%
+          nrow() %>%
+          valueBox(value = .,
+                   subtitle = HTML("<b>Grants closing in less than 3 months</b> <button id=\"show_region_grants_closing_3\" type=\"button\" class=\"btn btn-default action-button\">Show Grants</button>"))
+
+      })
+
+      output$region_grants_may_need_transfer <- renderValueBox({
+        
+        temp_df <- reactive_df()
+        temp_df %>% filter(funds_to_be_transferred > 1,percent_transferred_available<.3) %>%
+          nrow() %>%
+          valueBox(value = .,
+                   subtitle = HTML("<b>Grants that may require funds transferred</b> <button id=\"show_grants_need_transfer\" type=\"button\" class=\"btn btn-default action-button\">Show Grants</button>"),
+                   color = 'orange')
+
+      })
+      
+      
+      output$region_grants_active_no_transfer <- renderValueBox({
+        
+        temp_df <- reactive_df()
+        temp_df %>% filter(`Transfer-in USD`==0) %>%
+          nrow() %>%
+          valueBox(value = .,
+                   subtitle = HTML("<b>Active Grants without initial transfer</b> <button id=\"show_grants_no_first_transfer\" type=\"button\" class=\"btn btn-default action-button\">Show Grants</button>"),
+                   color = 'orange')
+        
+      })
+
+      output$disbursement_risk_GG <- renderPlot({
+       # data$focal_grants <- reactive_df()
+
+        plot_title <- paste("Disbursement Risk Overview for",input$focal_select_region,"Region")
+
+        data$focal_grants$plot_risk_name <- factor(
+          data$focal_grants$disbursement_risk_level,levels = c("Low Risk",
+                                                            "Medium Risk",
+                                                            "High Risk",
+                                                            "Very High Risk"))
+
+        data$focal_grants %>%
+          filter(!is.na(disbursement_risk_level)) %>%
+          ggplot(aes(x=plot_risk_name, fill=disbursement_risk_level)) +
+          geom_bar(stat='count') +
+          scale_fill_manual("legend", values = c("Very High Risk" = "#C70039",
+                                                 "High Risk" = "#FF5733",
+                                                 "Medium Risk" = "#FFC300",
+                                                 "Low Risk"= "#2ECC71")) +
+          theme_minimal() +
+          theme(legend.position = "none") +
+          labs(x="Risk Level", y="Number of Active Grants", title = plot_title)
+
+      })
+
+     output$very_high_risk <- renderValueBox({
+
+       temp_df <- reactive_df()
+       temp_df %>% filter(disbursement_risk_level=='Very High Risk') %>% nrow() %>%
+         valueBox(value=.,
+                  subtitle =HTML("<b>Very High Risk</b> <button id=\"show_grants_VHR\" type=\"button\" class=\"btn btn-default action-button\">Show Grants</button>"),
+                  color="red")
+
+     })
+
+     output$high_risk <- renderValueBox({
+
+       temp_df <- reactive_df()
+       temp_df %>% filter(disbursement_risk_level=='High Risk') %>% nrow() %>%
+         valueBox(value=.,
+                  subtitle =HTML("<b>High Risk</b> <button id=\"show_grants_HR\" type=\"button\" class=\"btn btn-default action-button\">Show Grants</button>"),
+                  color="orange")
+
+     })
+
+     output$medium_risk <- renderValueBox({
+       temp_df <- reactive_df()
+       temp_df %>% filter(disbursement_risk_level=='Medium Risk') %>% nrow() %>%
+         valueBox(value=.,
+                  subtitle =HTML("<b>Medium Risk</b> <button id=\"show_grants_MR\" type=\"button\" class=\"btn btn-default action-button\">Show Grants</button>"),
+                  color="yellow")
+
+     })
+
+     output$low_risk <- renderValueBox({
+       temp_df <- reactive_df()
+       temp_df %>% filter(disbursement_risk_level=='Low Risk') %>% nrow() %>%
+         valueBox(value=.,
+                  subtitle = HTML("<b>Low Risk</b> <button id=\"show_grants_LR\" type=\"button\" class=\"btn btn-default action-button\">Show Grants</button>"),
+                  color="green")
+
+     })
+
+    observeEvent(input$generate_risk_report,{
+
+      require(openxlsx)
+      data <- reactive_df()
+      region <- input$focal_select_region
+      wb <- createWorkbook()
+      df <- data %>% filter(`Fund Status`=="ACTV",`Grant Amount USD`>0)
+      df <- df %>%  select(Trustee,
+                           temp.name,
+                           Fund,
+                           `Fund Name`,
+                           `Project ID`,
+                           `DF Execution Type`,
+                           `Fund TTL Name`,
+                           Region,
+                           Country,
+                           `Grant Amount USD`,
+                           `Disbursements USD`,
+                           `Commitments USD`,
+                           months_to_end_disbursement,
+                           unnacounted_amount,
+                           percent_unaccounted,
+                           burn_rate,
+                           required_disbursement_rate,
+                           disbursement_risk_level)
+
+      report_title <- paste("Disbursement Risk Report for",region,"Region")
+
+      addWorksheet(wb, "Disbursement Risk Report")
+      mergeCells(wb,1,c(2,3,4),1)
+
+      writeData(wb, 1,
+                report_title,
+                startRow = 1,
+                startCol = 2)
+
+      writeDataTable(wb, 1, df, startRow = 3, startCol = 2)
+
+
+      low_risk <- createStyle(fgFill ="#2ECC71")
+      medium_risk <- createStyle(fgFill ="#FFC300")
+      high_risk <- createStyle(fgFill ="#FF5733")
+      very_high_risk <- createStyle(fgFill ="#C70039")
+
+      low_risk_rows <- which(df$disbursement_risk_level=="Low Risk")
+      medium_risk_rows <- which(df$disbursement_risk_level=="Medium Risk")
+      high_risk_rows <- which(df$disbursement_risk_level=="High Risk")
+      very_high_risk_rows <- which(df$disbursement_risk_level=="Very High Risk")
+
+
+      for (i in low_risk_rows){
+        addStyle(wb,1,rows=i+3,cols=1:length(df)+1,style = low_risk)
+      }
+
+      for (i in medium_risk_rows){
+        addStyle(wb,1,rows=i+3,cols=1:length(df)+1,style = medium_risk)
+      }
+
+      for (i in high_risk_rows){
+        addStyle(wb,1,rows=i+3,cols=1:length(df)+1,style = high_risk)
+      }
+
+      for (i in very_high_risk_rows){
+        addStyle(wb,1,rows=i+3,cols=1:length(df)+1,style = very_high_risk)
+      }
+
+      header_style <- createStyle(borderColour = getOption("openxlsx.borderColour", "black"),
+                                  borderStyle = getOption("openxlsx.borderStyle", "thick"),
+                                  halign = 'center', valign = 'center', textDecoration = NULL,
+                                  wrapText = TRUE)
+
+      addStyle(wb,1,rows=3,cols=2:length(df)+1,style = header_style)
+
+      ## opens a temp version
+      openXL(wb)
+    })
+
+    
+    observeEvent(input$show_grants_need_transfer, {
+      temp_df <- reactive_df()
+      
+      isolate(data <- temp_df %>%
+                filter(funds_to_be_transferred > 1,
+                       percent_transferred_available<.3) %>%
+                select(Fund,
+                       `Fund Name`,
+                       `Grant Amount USD`,
+                       `Fund TTL Name`,
+                       percent_unaccounted,
+                       months_to_end_disbursement,
+                       percent_transferred_available,
+                       funds_to_be_transferred,
+                       percent_left_to_transfer) %>%
+                arrange(percent_transferred_available) %>%
+                mutate(percent_unaccounted = percent((percent_unaccounted/100)),
+                       `Grant Amount USD` = dollar(`Grant Amount USD`),
+                       percent_left_to_transfer = percent(percent_left_to_transfer),
+                       percent_transferred_available = percent(percent_transferred_available),
+                       funds_to_be_transferred=dollar(funds_to_be_transferred)) %>%
+                rename("Months Left to Disburse" = months_to_end_disbursement,
+                       "Percentage total Grant available" = percent_unaccounted,
+                       "Percent of grant not yet transferred" = percent_left_to_transfer,
+                       "Amount not yet trasnferred"=funds_to_be_transferred,
+                       "Percentage of funds transferred available"=percent_transferred_available))
+      
+      showModal(modalDialog(size = 'l',
+                            title = "Grants that may require a transfer",
+                            renderTable(data),
+                            easyClose = TRUE))
+      
+    })
+    
+    #display list of grants that are actuive but have not received first transfer yet
+    observeEvent(input$show_grants_no_first_transfer, {
+      temp_df <- reactive_df()
+      
+      isolate(data <- temp_df %>%
+                filter(`Transfer-in USD` == 0) %>%
+                select(Fund,
+                       `Fund Name`,
+                       `Grant Amount USD`,
+                       `Fund TTL Name`,
+                       tf_age_months,
+                       months_to_end_disbursement,
+                       funds_to_be_transferred,
+                       percent_left_to_transfer) %>%
+                arrange(-tf_age_months) %>%
+                mutate(`Grant Amount USD` = dollar(`Grant Amount USD`),
+                       percent_left_to_transfer = percent(percent_left_to_transfer),
+                       funds_to_be_transferred=dollar(funds_to_be_transferred)) %>%
+                rename("Months Left to Disburse" = months_to_end_disbursement,
+                       "Number of months grant has been active" = tf_age_months,
+                       "Percent of grant not yet transferred" = percent_left_to_transfer,
+                       "Amount not yet trasnferred"=funds_to_be_transferred))
+      
+      showModal(modalDialog(size = 'l',
+                            title = "Active Grants Without Initial Transfer",
+                            renderTable(data),
+                            easyClose = TRUE))
+      
+    })
+    
+  
+
+    observeEvent(input$show_grants_VHR, {
+      data <- reactive_df()
+      isolate(data <- data %>% filter(`Grant Amount USD` != 0) %>%
+                filter(disbursement_risk_level == 'Very High Risk') %>%
+                select(Fund,
+                       `Fund Name`,
+                       `Grant Amount USD`,
+                       `Fund TTL Name`,
+                       `Grant Amount USD`,
+                       percent_unaccounted,
+                       months_to_end_disbursement,
+                       required_disbursement_rate) %>%
+                arrange(-required_disbursement_rate) %>%
+                mutate(percent_unaccounted = percent((percent_unaccounted/100)),
+                       `Grant Amount USD` = dollar(`Grant Amount USD`),
+                       required_disbursement_rate = required_disbursement_rate*100) %>%
+                rename("Months Left to Disburse" = months_to_end_disbursement,
+                       "Percentage available" = percent_unaccounted,
+                       "Required Monthly Disbursement Rate" = required_disbursement_rate))
+
+      showModal(modalDialog(size = 'l',
+                            title = "Very High Risk Grants",
+                            renderTable(data),
+                            easyClose = TRUE))
+
+    })
+    observeEvent(input$show_grants_HR, {
+     data <- reactive_df()
+      isolate(data <-  data %>% filter(`Fund Status` == "ACTV",
+                                     `Grant Amount USD` != 0,
+                                     Region == input$focal_select_region) %>%
+                 filter(disbursement_risk_level == 'High Risk') %>%
+                select(Fund,
+                       `Fund Name`,
+                       `Grant Amount USD`,
+                       `Fund TTL Name`,
+                       `Grant Amount USD`,
+                       percent_unaccounted,
+                       months_to_end_disbursement,
+                       required_disbursement_rate) %>%
+                arrange(-required_disbursement_rate) %>%
+                mutate(percent_unaccounted = percent((percent_unaccounted/100)),
+                       `Grant Amount USD` = dollar(`Grant Amount USD`),
+                       required_disbursement_rate = required_disbursement_rate*100) %>%
+                rename("Months Left to Disburse" = months_to_end_disbursement,
+                       "Percentage available" = percent_unaccounted,
+                       "Required Monthly Disbursement Rate" = required_disbursement_rate))
+
+      showModal(modalDialog(size = 'l',
+                            title = "High Risk Grants",
+                            renderTable(data),
+                            easyClose = TRUE))
+
+    })
+    observeEvent(input$show_grants_MR, {
+
+      data <- reactive_df()
+      isolate(data <- data %>% 
+                filter(`Grant Amount USD` != 0,
+                       disbursement_risk_level == 'Medium Risk') %>%
+                select(Fund,
+                       `Fund Name`,
+                       `Grant Amount USD`,
+                       `Fund TTL Name`,
+                       `Grant Amount USD`,
+                       percent_unaccounted,
+                       months_to_end_disbursement,
+                       required_disbursement_rate) %>%
+                arrange(-required_disbursement_rate) %>%
+                mutate(percent_unaccounted = percent((percent_unaccounted/100)),
+                       `Grant Amount USD` = dollar(`Grant Amount USD`),
+                       required_disbursement_rate = required_disbursement_rate*100) %>%
+                rename("Months Left to Disburse" = months_to_end_disbursement,
+                       "Percentage available" = percent_unaccounted,
+                       "Required Monthly Disbursement Rate" = required_disbursement_rate))
+
+      showModal(modalDialog(size = 'l',
+                            title = "Medium Risk Grants",
+                            renderTable(data),
+                            easyClose = TRUE))
+
+    })
+    observeEvent(input$show_grants_LR, {
+      data <- reactive_df()
+      isolate(data <- data %>% filter(disbursement_risk_level == 'Low Risk',
+                                     `Grant Amount USD` != 0) %>%
+                select(Fund,
+                       `Fund Name`,
+                       `Grant Amount USD`,
+                       `Fund TTL Name`,
+                       `Grant Amount USD`,
+                       percent_unaccounted,
+                       months_to_end_disbursement,
+                       required_disbursement_rate) %>%
+                arrange(-required_disbursement_rate) %>%
+                mutate(percent_unaccounted = percent((percent_unaccounted/100)),
+                       `Grant Amount USD` = dollar(`Grant Amount USD`),
+                       required_disbursement_rate = required_disbursement_rate*100) %>%
+                rename("Months Left to Disburse" = months_to_end_disbursement,
+                       "Percentage available" = percent_unaccounted,
+                       "Required Monthly Disbursement Rate" = required_disbursement_rate))
+
+      showModal(modalDialog(size = 'l',
+                            title = "Low Risk Grants",
+                            renderTable(data),
+                            easyClose = TRUE))
+
+    })
+    
+    
+    
+    
+    observeEvent(input$show_region_grants_closing_3, {
+      data <- reactive_df()
+      isolate(data <- data %>% filter(`Grant Amount USD` != 0,
+                                      months_to_end_disbursement <= 3) %>%
+                select(Fund,
+                       `Fund Name`,
+                       `Grant Amount USD`,
+                       `Fund TTL Name`,
+                       `Grant Amount USD`,
+                       percent_unaccounted,
+                       months_to_end_disbursement,
+                       required_disbursement_rate) %>%
+                arrange(-percent_unaccounted) %>%
+                mutate(percent_unaccounted = percent((percent_unaccounted/100)),
+                       `Grant Amount USD` = dollar(`Grant Amount USD`),
+                       required_disbursement_rate = percent(required_disbursement_rate)) %>%
+                rename("Months Left to Disburse" = months_to_end_disbursement,
+                       "Percentage available" = percent_unaccounted,
+                       "Required Monthly Disbursement Rate" = required_disbursement_rate))
+      
+      showModal(modalDialog(size = 'l',
+                            title = "Grants Closing in 3 Months or Less",
+                            renderTable(data),
+                            easyClose = TRUE))
+      
+    })
+    
+    
+    observeEvent(input$show_region_grants_no_discom, {
+      data <- reactive_df()
+      isolate(data <- data %>% filter(`Grant Amount USD` != 0,
+                                      tf_age_months >= 3,
+                                      percent_unaccounted==100) %>%
+                select(Fund,
+                       `Fund Name`,
+                       `Grant Amount USD`,
+                       `Fund TTL Name`,
+                       percent_unaccounted,
+                       tf_age_months,
+                       months_to_end_disbursement,
+                       required_disbursement_rate) %>%
+                arrange(-tf_age_months) %>%
+                mutate(percent_unaccounted = percent((percent_unaccounted/100)),
+                       `Grant Amount USD` = dollar(`Grant Amount USD`),
+                       required_disbursement_rate = percent(required_disbursement_rate)) %>%
+                rename("Months Left to Disburse" = months_to_end_disbursement,
+                       "Percentage available" = percent_unaccounted,
+                       "Required Monthly Disbursement Rate" = required_disbursement_rate,
+                       "Months Since Grant Activation"=tf_age_months))
+      
+      showModal(modalDialog(size = 'l',
+                            title = "Grants Closing in 6 Months or Less",
+                            renderTable(data),
+                            easyClose = TRUE))
+      
+    })
+    
+    
+    
+    
+    output$RETF_n_grants_R <- renderValueBox({
+      
+      temp_df <- reactive_df_2()
+      temp_df %>% nrow() %>%
+        valueBox(value=.,
+                 subtitle =HTML("<b>Active RETF grants</b> <button id=\"show_grants_RETF_R\" type=\"button\" class=\"btn btn-default action-button\">Show Grants</button>"),
+                 color="blue")
+      
+    })
+    
+  
+    observeEvent(input$show_grants_RETF_R, {
+      data <- reactive_df_2()
+      isolate(data <- data %>% filter(`Grant Amount USD` != 0) %>%
+                select(Fund,
+                       `Fund Name`,
+                       `Grant Amount USD`,
+                       temp.name,
+                       `Fund TTL Name`,
+                       `TTL Unit Name`,
+                       tf_age_months,
+                       months_to_end_disbursement) %>%
+                arrange(-tf_age_months) %>%
+                mutate(`Grant Amount USD` = dollar(`Grant Amount USD`)) %>%
+                rename("Months Left to Disburse" = months_to_end_disbursement,
+                       "Months Since Grant Activation"= tf_age_months,
+                       "Trustee"= temp.name))
+      
+      showModal(modalDialog(size = 'l',
+                            title = "BETF grants",
+                            renderTable(data),
+                            easyClose = TRUE))
+      
+    })
+    
+    output$`RETF_$_grants_R` <- renderValueBox({
+      
+      temp_df <- reactive_df_2()
+      sum(temp_df$`Grant Amount USD`) %>% dollar() %>% 
+        valueBox(value=.,
+                 subtitle = "Active RETF funds amount",
+                 color="blue")
+      
+    })
+    
+    
+    output$RETF_trustees_R_pie <- renderPlotly({
+      
+      remove_num <- function(x){
+        word <- x
+        letter <- stri_sub(x,5)
+        if(letter %in% c("1","2","3","4","5","6","7","8","9")){
+          return(stri_sub(x,1,4))} else{
+            return(stri_sub(word))
+          }
+      }
+      
+      temp_df <- reactive_df_2()
+      
+      temp_df$aggregate_unit <- sapply(temp_df$`TTL Unit Name`, function(x) remove_num(x)) %>% as.vector()
+      data <- temp_df %>% 
+        group_by(`aggregate_unit`) %>% 
+        summarise(n_grants = n(), total_award_amount = sum(`Grant Amount USD`))
+      
+      plot_ly(data, labels = ~aggregate_unit, values = ~total_award_amount, type = 'pie') %>%
+        layout(xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+               yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE))
+      
+      
+    })
+    
+    
+    
+
+    
+#final closing brackets    
+    
+    
+    
+# TAB.4 PMA -------------------------------------
+    output$resources_available <- renderInfoBox({
+      sum(PMA_grants$unnacounted_amount) %>%
+        dollar() %>% 
+      infoBox("Active PMA Resources Available",value=.,color = 'green')
+      
+    })
+  
+    output$PMA_chart_1 <- renderPlotly({
+      
+      colourCount = length(unique(grouped_gg_data$fund))
+      getPalette = colorRampPalette(brewer.pal(7, "Set2"),bias=2)
+      
+      gg <- ggplot(gg_df,aes(x=factor(quarterr),
+                             y=amount,
+                             fill=fund,
+                             text=paste(as.character(zoo::as.yearqtr(gg_df$quarterr)),"\n",
+                                        "Total Av. Quarter:",dollar(Q_amount),"\n",
+                                        "PMA TF Name:",fund_name,"\n",
+                                        "PMA TF Number:",fund,"\n",
+                                        "PMA TF Av. Quarter:",dollar(amount)))) +
+        geom_bar(stat="identity") +
+        theme_classic() +
+        scale_fill_manual(values =  getPalette(colourCount))+
+        scale_x_discrete(labels=c(unique(as.character(zoo::as.yearqtr(gg_df$quarterr)))))+
+        scale_y_continuous(labels=dollar_format(prefix="$"),
+                           breaks =c(25,50,75,100,125,150,175,200,225,250,275,300)*10000) +
+        labs(x="Quarter", y="Available USD Amount") + theme(legend.position = 'none')
+      
+      plotly::ggplotly(gg,tooltip='text')
+      
+      
+      
+    })
+    
+    
+    output$streamgraph <- renderStreamgraph({
+      
+      streamgraph(data = gg_df,
+                  key = "fund_name",
+                  value ="amount",
+                  date = 'quarterr',
+                  order="inside-out",
+                  offset="zero") %>% sg_legend(show=TRUE, label="PMA Grant Names:") 
+    
+      })
+    
+    
+    
+    output$current_quarter <- renderInfoBox({
+      current_Q_date <- zoo::as.yearqtr(date_data_udpated) %>% as_date()
+      
+      current_Q_amount <- grouped_gg_data[grouped_gg_data$quarterr==current_Q_date,] [1,6] %>%
+        as.numeric()
+      
+      infoBox("Available in Current Quarter",
+              value = dollar(current_Q_amount),icon = icon("wallet")) })
+      
+      output$next_quarter <- renderInfoBox({
+        current_Q_date <- zoo::as.yearqtr(date_data_udpated) %>% as_date() 
+        
+        next_Q_date <- current_Q_date %m+% months(3) %>% as_date()
+        
+        current_Q_amount <- grouped_gg_data[grouped_gg_data$quarterr==current_Q_date,] [1,6] %>%
+          as.numeric()
+        next_Q_amount <- grouped_gg_data[grouped_gg_data$quarterr==next_Q_date,] [1,6] %>%
+          as.numeric()
+        
+        arrow_icon <- ifelse(current_Q_amount==next_Q_amount,"arrow-right",
+                       ifelse(current_Q_amount<next_Q_amount,"arrow-up","arrow-down"))
+        
+        infoBox("Available in next Quarter",
+                value = dollar(next_Q_amount),icon = icon(as.character(arrow_icon)))
+      
+      })
+      
+        output$PMA_grants_n <- renderInfoBox({
+          
+          PMA_grants %>% filter(`Fund Status`=="ACTV") %>% nrow() %>% 
+          infoBox("Active PMA Grants",
+                  value = .,icon = icon("list-ol"),
+                  subtitle = HTML("<button id=\"show_PMA_grants\" type=\"button\" class=\"btn btn-default action-button\">Show Grants</button>"))
+          
+    })
+    
+        observeEvent(input$show_PMA_grants, {
+          data <- PMA_grants
+         data <- data %>% filter(`Grant Amount USD` != 0,
+                                          `Fund Status`=="ACTV") %>%
+                    select(Fund,
+                           `Fund Name`,
+                           `Grant Amount USD`,
+                           `Fund TTL Name`,
+                           Region,
+                           percent_unaccounted,
+                           tf_age_months,
+                           months_to_end_disbursement,
+                           ) %>%
+                    arrange(months_to_end_disbursement) %>%
+                    mutate(percent_unaccounted = percent((percent_unaccounted/100)),
+                           `Grant Amount USD` = dollar(`Grant Amount USD`)) %>%
+                    rename("Months Left to Disburse" = months_to_end_disbursement,
+                           "Percentage Available" = percent_unaccounted,
+                           "Months Since Grant Activation"= tf_age_months)
+          
+          showModal(modalDialog(size = 'l',
+                                title = "Active PMA Grants",
+                                renderTable(data),
+                                easyClose = T))
+          
+        })
+        
+    
+    
+        
+        
+# TAB.5 GRANT DASHBOARD
+        
+        reactive_grant <- reactive({
+          #input$focal_select_region
+          grants %>%
+            filter(Fund==input$child_TF_num) 
+        })
+        
+        reactive_grant_expense <- reactive({
+          #input$focal_select_region
+          data_2 %>%
+            filter(child_TF==input$child_TF_num) 
+        })
+        
+        output$grant_name <- renderText({
+          
+          grant <- reactive_grant()
+          
+          isolate(if(!is.null(input$child_TF_num)){
+            text <-  grant$`Fund Name` %>% as.character()
+          } else {
+            text <- NULL
+          })
+          text 
+        })
+        
+        
+        
+        output$grant_TTL <- renderText({
+          
+          grant <- reactive_grant()
+          
+          isolate(if(!is.null(input$child_TF_num)){
+              text <-  ifelse(is.na(grant$`Co-TTL1 Name`),
+                              grant$`Fund TTL Name`,
+                              ifelse(grant$`Fund TTL Name` != grant$`Co-TTL1 Name`,
+                                     paste(grant$`Fund TTL Name`,"&",grant$`Co-TTL1 Name`),
+                                     grant$`Fund TTL Name`))
+                          
+          } else {
+            text <- NULL
+          })
+          text %>% as.character()
+        })
+        
+        
+        
+        
+        output$grant_country <- renderText({
+          
+          grant <- reactive_grant()
+          
+          isolate(if(!is.null(input$child_TF_num)){
+            text <-  grant$Country
+            
+          } else {
+            text <- NULL
+          })
+        
+          text %>% as.character()
+        })
+        
+        
+        
+        
+        output$grant_region <- renderText({
+          
+          grant <- reactive_grant()
+          
+          isolate(if(!is.null(input$child_TF_num)){
+            text <-  grant$`Fund Country Region Name`
+            
+          } else {
+            text <- NULL
+          })
+          
+          text <- ifelse(text=="OTHER","Global",text)
+          text %>% as.character()
+        })
+        
+        output$grant_unit <- renderText({
+          
+          grant <- reactive_grant()
+          
+          isolate(if(!is.null(input$child_TF_num)){
+            text <-  grant$`TTL Unit Name`
+            
+          } else {
+            text <- NULL
+          })
+          text %>% as.character()
+        })
+        
+        output$single_grant_amount <- renderValueBox({
+          grant <- reactive_grant()
+          grant$`Grant Amount USD` %>% dollar() %>% 
+            valueBox(value=.,subtitle = "Grant Amount",color = "green")
+          
+          
+        })
+        
+        output$single_grant_remaining_bal <- renderValueBox({
+          grant <- reactive_grant()
+          grant$unnacounted_amount %>% dollar() %>% 
+            valueBox(value=.,subtitle = "Remaining Balance",color = "green")
+          
+        })
+        
+        
+        
+        
+        output$single_grant_m_active <- renderValueBox({
+          grant <- reactive_grant()
+          grant$tf_age_months %>% as.numeric() %>% 
+            valueBox(value=.,subtitle = "Months since activation",color = "yellow")
+          
+          
+        })
+        
+        
+        output$single_grant_m_disrate <- renderValueBox({
+          grant <- reactive_grant()
+          grant$monthly_disbursement_rate %>% percent()%>% 
+            valueBox(value=.,subtitle = "Monthly Disbursement Rate",color = "yellow")
+          
+          
+        })
+        
+        
+        output$single_grant_m_to_close<- renderValueBox({
+          grant <- reactive_grant()
+          grant$months_to_end_disbursement %>% as.numeric() %>% 
+          valueBox(value=.,subtitle = "Months to end disbursement",color = "orange")
+          
+          
+        })
+        
+        output$single_grant_m_req_disrate<- renderValueBox({
+          grant <- reactive_grant()
+          grant$required_disbursement_rate %>% percent() %>% 
+            valueBox(value=.,subtitle = "Months to end disbursement",color = "orange")
+          
+          
+        })
+        
+        
+        output$grant_expense_GG <- renderPlotly({
+          TTL_spending_df <- reactive_grant_expense()
+          
+          gg <-
+            ggplot(TTL_spending_df,
+                   aes(reorder(item_group, -total_disbursed), total_disbursed,
+                       fill=item_group)) +
+            geom_col() +
+            theme_classic() +
+            labs(x = "Expense Category", y = "Amount Disbursed") +
+            theme(axis.text.x = element_blank()) +
+            scale_y_continuous(labels=dollar_format(prefix="$")) +
+            labs(fill="Expense Category")
+            
+            
+          
+          ggplotly(gg)
+        })
+        
+        
+        output$expense_table <- renderTable({
+          df <- reactive_grant_expense()
+          grant_amount <- reactive_grant()
+          grant_amount <- grant_amount$`Grant Amount USD`
+          df  %>%
+            group_by(item_group) %>%
+            summarise('total_dis' = sum(total_disbursed)) %>%
+            arrange(-total_dis) %>%
+            mutate(
+              "percent_of_total" = percent(total_dis /grant_amount),
+              'total_dis' = dollar(total_dis))  %>%
+            rename(
+              "Expense Category" = item_group,
+              "Disbursed to date" = total_dis,
+              "% of Grant" = percent_of_total
+            )
+        })
+        
+## TTL DASHABOARD ----------------
+        reactive_TTL <- reactive({
+          #input$focal_select_region
+          grants %>%
+            filter(as.numeric(`Project TTL UPI`)==as.numeric(input$TTL_upi))
+        })
+        
+        reactive_grant_expense <- reactive({
+          
+          TTL <- reactive_TTL()
+          ttl_name <- TTL$`Project TTL UPI`[1]
+          #input$focal_select_region
+          data_2 %>%
+            filter(TTL==ttl_name) 
+        })
+        
+        output$TTL_name_dash <- renderText({
+          
+         TTL <- reactive_TTL()
+          
+          isolate(if(!is.null(input$TTL_upi)){
+            text <-  TTL$`Fund TTL Name` %>% unique() %>% as.character()
+          } else {
+            text <- NULL
+          })
+          text 
+        })
+        
+        output$TTL_unit_dash <- renderText({
+
+          TTL <- reactive_TTL()
+
+          isolate(if(!is.null(input$TTL_upi)){
+            text <-  unique(TTL$`TTL Unit Name`)
+
+          } else {
+            text <- NULL
+          })
+
+          text %>% as.character()
+        })
+
+
+        output$TTL_total_grant_amount <- renderValueBox({
+
+          TTL <- reactive_TTL()
+
+          isolate(if(!is.null(input$TTL_upi)){
+            sum(TTL$`Grant Amount USD`) %>%
+              dollar %>%
+              valueBox(value=.,subtitle = "Total Grant Amount",color = 'green')
+
+          } else {
+            NULL
+          })
+        })
+      
+        
+        output$TTL_grants_active <- renderValueBox({
+          
+          TTL <- reactive_TTL()
+          TTL <- dplyr::distinct(TTL)
+          isolate(if(!is.null(input$TTL_upi)){
+              valueBox(value=nrow(TTL),subtitle = "Number of Active Grants")
+            
+          } else {
+            NULL
+          })
+        })
+
+        output$TTL_total_remaining_bal <- renderValueBox({
+          
+          TTL <- reactive_TTL()
+          TTL <- dplyr::distinct(TTL)
+          isolate(if(!is.null(input$TTL_upi)){
+            valueBox(value=dollar(sum(TTL$unnacounted_amount)),subtitle = "Total Remaining Balance")
+            
+          } else {
+            NULL
+          })
+        })
+
+        
+        
+        # output$TTL_balance_GG <- renderPlotly({
+        #   df <- reactive(TTL)
+        #   
+        #   gg <-
+        #     ggplot(TTL_spending_df,
+        #            aes(reorder(item_group, -total_disbursed), total_disbursed,
+        #                fill=item_group)) +
+        #     geom_col() +
+        #     theme_classic() +
+        #     labs(x = "Expense Category", y = "Amount Disbursed") +
+        #     theme(axis.text.x = element_blank()) +
+        #     scale_y_continuous(labels=dollar_format(prefix="$")) +
+        #     labs(fill="Expense Category")
+        #   
+        #   
+        # 
+        #   ggplotly(gg)
+        # })
+        # 
+        
+        
+        # output$single_grant_amount <- renderValueBox({
+        #   grant <- reactive_grant()
+        #   grant$`Grant Amount USD` %>% dollar() %>% 
+        #     valueBox(value=.,subtitle = "Grant Amount",color = "green")
+        #   
+        #   
+        # })
+        # 
+        # output$single_grant_remaining_bal <- renderValueBox({
+        #   grant <- reactive_grant()
+        #   grant$unnacounted_amount %>% dollar() %>% 
+        #     valueBox(value=.,subtitle = "Remaining Balance",color = "green")
+        #   
+        # })
+        # 
+        # 
+        # 
+        # 
+        # output$single_grant_m_active <- renderValueBox({
+        #   grant <- reactive_grant()
+        #   grant$tf_age_months %>% as.numeric() %>% 
+        #     valueBox(value=.,subtitle = "Months since activation",color = "yellow")
+        #   
+        #   
+        # })
+        # 
+        # 
+        # output$single_grant_m_disrate <- renderValueBox({
+        #   grant <- reactive_grant()
+        #   grant$monthly_disbursement_rate %>% percent()%>% 
+        #     valueBox(value=.,subtitle = "Monthly Disbursement Rate",color = "yellow")
+        #   
+        #   
+        # })
+        # 
+        # 
+        # output$single_grant_m_to_close<- renderValueBox({
+        #   grant <- reactive_grant()
+        #   grant$months_to_end_disbursement %>% as.numeric() %>% 
+        #     valueBox(value=.,subtitle = "Months to end disbursement",color = "orange")
+        #   
+        #   
+        # })
+        # 
+        # output$single_grant_m_req_disrate<- renderValueBox({
+        #   grant <- reactive_grant()
+        #   grant$required_disbursement_rate %>% percent() %>% 
+        #     valueBox(value=.,subtitle = "Months to end disbursement",color = "orange")
+        #   
+        #   
+        # })
+        # 
+        # 
+        # output$grant_expense_GG <- renderPlotly({
+        #   TTL_spending_df <- reactive_grant_expense()
+        #   
+        #   gg <-
+        #     ggplot(TTL_spending_df,
+        #            aes(reorder(item_group, -total_disbursed), total_disbursed,
+        #                fill=item_group)) +
+        #     geom_col() +
+        #     theme_classic() +
+        #     labs(x = "Expense Category", y = "Amount Disbursed") +
+        #     theme(axis.text.x = element_blank()) +
+        #     scale_y_continuous(labels=dollar_format(prefix="$")) +
+        #     labs(fill="Expense Category")
+        #   
+        #   
+        #   
+        #   ggplotly(gg)
+        # })
+        # 
+        # 
+        # output$expense_table <- renderTable({
+        #   df <- reactive_grant_expense()
+        #   grant_amount <- reactive_grant()
+        #   grant_amount <- grant_amount$`Grant Amount USD`
+        #   df  %>%
+        #     group_by(item_group) %>%
+        #     summarise('total_dis' = sum(total_disbursed)) %>%
+        #     arrange(-total_dis) %>%
+        #     mutate(
+        #       "percent_of_total" = percent(total_dis /grant_amount),
+        #       'total_dis' = dollar(total_dis))  %>%
+        #     rename(
+        #       "Expense Category" = item_group,
+        #       "Disbursed to date" = total_dis,
+        #       "% of Grant" = percent_of_total
+        #     )
+        # })
+        # 
+        
+        
+        
+        
+        
+        
+})
+
+
+
+

@@ -173,6 +173,7 @@ tab.3 <-  tabItem(tabName= "regions",class='active',
                                         choices = c("Select region",sort(unique(grants$Region))),
                                         selectize = TRUE,
                                         selected="AFR"))),
+                                      
   column(width=4,box(title = 'Region',
                      textOutput('focal_region_name'),
                      width = NULL)),

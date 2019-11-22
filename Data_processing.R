@@ -17,7 +17,24 @@ recode_trustee <- read_xlsx('recodes.xlsx',sheet=1) %>% select(-Status)
 recode_region <- read_xlsx('recodes.xlsx',sheet=2)
 
 expenses <- read.csv(file='V2_GFDRR TF Expense Details - FY18 and FY19 YTD(AutoRecovered).csv',
-                     stringsAsFactors = FALSE)[1:6958,1:17]
+                     stringsAsFactors = FALSE,col.names =  c("Disbursing.Trust.Fund",
+                                                             "Disbursing.Trust.Fund.Description",
+                                                             "TF.Status",
+                                                             "Task.team.Leader",
+                                                             "Managing.Unit",
+                                                             "Region",
+                                                             "Global.Practice",
+                                                             "Trustee",
+                                                             "Trustee.Description",
+                                                             "TF.Creation.date",
+                                                             "TF.Closing.Date",
+                                                             "Cost.Object",
+                                                             "Cost.Object.Description",
+                                                             "Commitment.item",
+                                                             "Commitment.Item.Group",
+                                                             "Disbursements.FY.2018",
+                                                             "Disbursements.FY.2019...YTD.Feb.2019"))[1:6958,1:17]
+
 expenses <- expenses %>% mutate(Disbursements.FY.2018=as.numeric(Disbursements.FY.2018),
                             Disbursements.FY.2019...YTD.Feb.2019=as.numeric(Disbursements.FY.2019...YTD.Feb.2019))
 

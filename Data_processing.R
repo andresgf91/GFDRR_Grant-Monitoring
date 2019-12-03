@@ -6,7 +6,7 @@ options(scipen = 999)
 # READ IN DATA ------------------------------------------------------------
 
 sap <- read_xlsx('SAP Data as of June 30_2019.xlsx')
-grants <- read_xlsx("GFDRR Dashboard grant level 10_8_19.xlsx")
+grants <- read_xlsx("GFDRR Dashoard grant level 12_2_19.xlsx")
 
 date_data_udpated <- lubridate::as_date("19/10/08")
 

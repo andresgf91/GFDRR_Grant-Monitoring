@@ -33,8 +33,8 @@ server <- shinyServer(function(input,output,session) {
       sum(active_trustee$`Net Signed Condribution in USD`) %>%
       dollar() %>% 
       infoBox(
-        "Total Pledged Amount", ., icon = icon("money-check-alt"),
-        color = "blue", subtitle = "* across all active trustees")
+        "Total Pledged", ., icon = icon("money-check-alt"),
+        color = "blue", subtitle = "*all active trustees")
       })
     
     output$total_received <- renderInfoBox({
@@ -42,7 +42,7 @@ server <- shinyServer(function(input,output,session) {
       dollar() %>% 
       infoBox(
         "Total Contributions Received", ., icon = icon("hand-holding-usd"),
-        color = "blue", subtitle = "* across all active trustees")
+        color = "blue", subtitle = "*all active trustees")
       
       })
     
@@ -51,7 +51,7 @@ server <- shinyServer(function(input,output,session) {
       dollar()%>% 
         infoBox(
           "Total Pending (Un-paid)", ., icon = icon("file-invoice-dollar"),
-          color = "blue", subtitle = "* across all active trustees")
+          color = "blue", subtitle = "*all active trustees")
       
       })
     
@@ -63,7 +63,7 @@ server <- shinyServer(function(input,output,session) {
       dollar()%>% 
         infoBox(
           "Total Remaining Balance", ., icon = icon("receipt"),
-          color = "blue", subtitle = "* across all active grants")
+          color = "blue", subtitle = "*all active grants")
       })
     
     output$`closing<12` <- renderInfoBox({
@@ -71,7 +71,7 @@ server <- shinyServer(function(input,output,session) {
         active_trustee %>%
         filter(months_to_end_disbursement<=12) %>% nrow() %>% 
         infoBox(
-          "Trustees with < 12 months to disburse",
+          "Trustees closing in < 12 months",
           .,
           icon = icon("stopwatch"),
           color = "orange")
@@ -81,7 +81,7 @@ server <- shinyServer(function(input,output,session) {
       active_trustee %>%
         filter(months_to_end_disbursement<=6) %>% nrow() %>% 
         infoBox(
-          "Trustees with < 6 months to disburse",
+          "Trustees closing in < 6 months",
           .,
           icon = icon("stopwatch"),
           color = "red")
@@ -152,11 +152,101 @@ server <- shinyServer(function(input,output,session) {
         filter(`Fund Status` == "ACTV") %>% select(Fund) %>% 
         distinct() %>% nrow() %>% 
         valueBox(.,
-          subtitle = "Active Grants",
+          subtitle = "All Active Grants",
           icon = icon("list-ol"),
           color = "green")
     })
+    
+    
+    #OPERATIONAL GRANTS ONLY 
+    
+    output$number_active_grants_op <- renderValueBox({
+      
+      temp_grants <- grants %>%
+        filter(`Fund Status` == "ACTV",PMA=="no") %>% select(Fund) %>% 
+        distinct() %>% nrow() %>% 
+        valueBox(.,
+                 subtitle = "Active Operational Grants",
+                 icon = icon("list-ol"),
+                 color = "blue")
+    })
+    
+    
+    output$total_remaining_balance_op <- renderInfoBox({
+      
+      temp_grants <- grants %>% filter(Trustee %in% active_trustee$Fund,
+                                       `Fund Status`=="ACTV",PMA=="no")
+      sum(temp_grants$unnacounted_amount) %>% 
+        dollar()%>% 
+        infoBox(
+          "Total Remaining Balance", ., icon = icon("receipt"),
+          color = "blue", subtitle = "*operational grants")
+    })
+    
   
+    
+    
+    
+    output$overview_progress_GG_op <- renderPlotly({
+      
+      temp_df <- grants %>% filter(`Fund Status`=="ACTV",PMA=="no")
+      
+      new_df <- data.frame(Disbursed=sum(temp_df$`Disbursements USD`),
+                           Committed=sum(temp_df$`Commitments USD`),
+                           "Remaining"=sum(temp_df$unnacounted_amount)) %>% 
+        reshape2::melt() %>%
+        mutate(total=sum(temp_df$`Grant Amount USD`)) %>%
+        mutate(percent=value/total)
+      
+      gg <- new_df %>% ggplot(aes(x=total,
+                                  y=value,
+                                  fill=variable,
+                                  label=percent(percent),
+                                  text=paste(variable,"\n",
+                                             "USD Amount:",dollar(value),"\n",
+                                             "Percentage of Total:",percent(percent)))) +
+        geom_bar(stat='identity',position = 'stack') +
+        # coord_flip() +
+        theme_minimal() +
+        labs(y="USD Amount")+
+        theme(axis.title.y = element_blank(),
+              axis.text.y = element_blank(),
+              axis.ticks.y = element_blank(),
+              panel.background = element_blank(),
+              panel.grid = element_blank(),
+              axis.text.x = element_blank(),
+              axis.ticks.x = element_blank()) +
+        theme(#legend.direction = "horizontal",
+          legend.position = 'bottom',
+          legend.title = element_blank(),
+          axis.title.x = element_blank(),
+          plot.margin = unit(c(0,0,0,0), "cm")) +
+        coord_flip() +
+        scale_fill_discrete(breaks=c("Remaining","Committed","Disbursed")) +
+        scale_fill_brewer(palette = "Blues") +
+        geom_text(size = 3, position = position_stack(vjust = 0.5),) 
+      
+      plotly::ggplotly(gg, tooltip = "text") %>%
+        layout(legend = list(orientation = 'h',
+                             font = list(size = 10),
+                             x=.2, y = -4,
+                             traceorder="reversed"))
+      
+    })
+    
+    
+    #PMA grant number
+    output$number_active_grants_pma <- renderValueBox({
+      
+      temp_grants <- grants %>%
+        filter(`Fund Status` == "ACTV",PMA=="yes") %>% select(Fund) %>% 
+        distinct() %>% nrow() %>% 
+        valueBox(.,
+                 subtitle = "Active PMA Grants",
+                 icon = icon("list-ol"),
+                 color = "yellow")
+    })
+    
     
     output$region_GP_GG <- renderPlotly({
       
@@ -180,13 +270,13 @@ server <- shinyServer(function(input,output,session) {
         layout(xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
                yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE))
       
-      
+       
     })
     
     
     output$n_grants_region <- renderPlotly({
       
-      temp_df <- grants %>% filter(`Fund Status`=="ACTV")
+      temp_df <- grants %>% filter(`Fund Status`=="ACTV",PMA=="no")
       gg <- temp_df %>% 
         group_by(Region) %>%
         summarise(n_grants = n(), total_award_amount = sum(`Grant Amount USD`)) %>%
@@ -200,7 +290,7 @@ server <- shinyServer(function(input,output,session) {
                               dollar(total_award_amount)))) +
         geom_col(fill='royalblue',alpha=.7) +
         theme_classic() +
-        labs(x="Region", y="Number of Grants")+
+        labs(x="Region", y="Number of Grants",title="Active Operational Grants by Region")+
         theme(rect = element_rect(fill="transparent"),
               plot.background = element_rect(fill="transparent",color=NA),
               panel.background = element_rect(fill="transparent")) 

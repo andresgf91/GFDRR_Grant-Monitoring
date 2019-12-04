@@ -10,7 +10,7 @@ grants <- read_xlsx("GFDRR Dashoard grant level 12_2_19.xlsx")
 
 date_data_udpated <- lubridate::as_date("19/10/08")
 
-dash <- read_xlsx('GFDRR Dashboard - 201910.xlsx', sheet = 3, skip = 2)
+#dash <- read_xlsx('GFDRR Dashboard - 201910.xlsx', sheet = 3, skip = 2)
 #trustee <- read_xls('GFDRR_mg_unit.xls', skip=2)
 trustee <- read_xlsx('GFDRR Dashboard Trustee Level 10_8_19.xlsx')
 recode_trustee <- read_xlsx('recodes.xlsx',sheet=1) %>% select(-Status)

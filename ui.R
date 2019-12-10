@@ -34,7 +34,8 @@ source("Plots.R")
 
 ## Header ---------------
 header <- dashboardHeader(title = "GFDRR Secretariat Draft Dashboard",
-                          dropdownMenuOutput("notifications_Menu"))
+                          dropdownMenuOutput("notifications_Menu"),
+                          dropdownMenuOutput("date_data_updated_message"))
 
 ## Sidebar ---------------
 sidebar <- dashboardSidebar(
@@ -89,7 +90,7 @@ tab.1 <-  tabItem(tabName = "overview",
              plotlyOutput("n_grants_region",height=450)),
     tabPanel("Active Funding per Region",
              plotlyOutput("funding_region",height=450)),
-    tabPanel("Active Funding per GP",
+    tabPanel("Active Funding by Global Theme",
              plotlyOutput("funding_GP",height=450))))))
 
 # tab 1.3 ------
@@ -172,68 +173,134 @@ tab.2 <- tabItem(tabName= "parent_tf",
 
 ## tab.3 (Regions View) ---------------
 
-tab.3 <-  tabItem(tabName= "regions",class='active',
-                  fluidPage(titlePanel("Regional View"), fluidRow(
-  column(width=2, wellPanel(selectInput('focal_select_region',"Select a Region",
-                                        choices = c("Select region",sort(unique(grants$Region))),
-                                        selectize = TRUE,
-                                        selected="AFR"))),
-                                      
-  column(width=4,box(title = 'Region',
-                     textOutput('focal_region_name'),
-                     width = NULL)),
-  column(width=4,wellPanel(selectInput('focal_select_trustee',"Select a Trustee",
-                                        choices = c("All" = "",sort(unique(grants$temp.name))),
-                                        multiple = TRUE,
-                                       selectize = TRUE,
-                                       selected = unique(grants$temp.name),
-                             width = NULL))),
-  column(width=2,wellPanel(selectInput("region_BE_RE","Selected Grant Excution Types",
-                             choices= unique(grants$`DF Execution Type`),
-                             multiple = T,
-                             selectize = T,
-                             selected=unique(grants$`DF Execution Type`))))),
-  fluidRow(
-    tabsetPanel(type='pills',tabPanel(title="Overview",
-                 fluidRow(column(width=6,
-                                 wellPanel(
-                   infoBoxOutput(outputId = "focal_active_grants",
-                                 width = NULL),
-                   infoBoxOutput(outputId = "focal_active_funds",
-                                 width= NULL),
-                   plotlyOutput("region_remaining_committed_disbursed",height = 100))),
-                   column(width=3,
-                          valueBoxOutput(outputId ="focal_grants_closing_3",
-                                         width=NULL),
-                          valueBoxOutput(outputId ="focal_grants_active_3_zero_dis",
-                                         width=NULL)),
-                   column(width=3,
-                          valueBoxOutput(outputId ="region_grants_may_need_transfer",
-                                         width=NULL),
-                          valueBoxOutput(outputId ="region_grants_active_no_transfer",
-                                         width=NULL))),
-                   tabsetPanel(tabPanel(
-                     title="Parent Fund",
-                     plotlyOutput(outputId = "focal_region_n_grants_GG",width = 1000)),
-                     tabPanel(
-                       title="Unit (will be GP)",
-                       plotlyOutput(outputId = "region_GP_GG",width = 1200)))),
-                 tabPanel(title = "Disbursement Risk",
-                          fluidRow(plotOutput(outputId = "disbursement_risk_GG"),
-                                          valueBoxOutput("low_risk",width = 3),
-                                          valueBoxOutput("medium_risk",width = 3),
-                                          valueBoxOutput("high_risk",width = 3),
-                                          valueBoxOutput("very_high_risk",width = 3),
-                                   fluidRow(actionButton("generate_risk_report",
-                                                         "Generate Excel Risk Report")))),
-                tabPanel(title="Countries",
-                         DT::dataTableOutput(outputId = "region_countries_grants_table")),
-                tabPanel(title="RETF grants",fluidRow(
-                         valueBoxOutput("RETF_n_grants_R"),
-                         valueBoxOutput("RETF_$_grants_R")),
-                         fluidRow(
-                         plotlyOutput("RETF_trustees_R_pie"))
-                         )))))
+tab.3 <-  tabItem(tabName = "regions",
+                  class = 'active',
+                  fluidPage(
+                    titlePanel("Regional View"),
+                    fluidRow(
+                      column(width = 3, wellPanel(
+                        selectInput(
+                          'focal_select_region',
+                          "Selected Region(s):",
+                          choices = sort(unique(grants$Region)),
+                          multiple = TRUE,
+                          selectize = TRUE,
+                          selected = sort(unique(grants$Region))
+                        )
+                      )),
+                      
+                      # column(width = 4, box(
+                      #   title = 'Region',
+                      #   textOutput('focal_region_name'),
+                      #   width = NULL
+                      # )),
+                      column(width = 6, wellPanel(
+                        selectInput(
+                          'focal_select_trustee',
+                          "Select a Trustee",
+                          choices = c("All" = "", sort(unique(grants$temp.name))),
+                          multiple = TRUE,
+                          selectize = TRUE,
+                          selected = unique(grants$temp.name),
+                          width = NULL
+                        )
+                      )),
+                      column(width = 2, wellPanel(
+                        selectInput(
+                          "region_BE_RE",
+                          "Selected Grant Execution Type(s):",
+                          choices = unique(grants$`DF Execution Type`),
+                          multiple = T,
+                          selectize = T,
+                          selected = unique(grants$`DF Execution Type`)
+                        )
+                      ))
+                    ),
+                    fluidRow(
+                      tabsetPanel(
+                        type = 'pills',
+                        tabPanel(
+                          title = "Overview",
+                          fluidRow(
+                            column(
+                              width = 6,
+                              wellPanel(
+                                infoBoxOutput(outputId = "focal_active_grants",
+                                              width = NULL),
+                                infoBoxOutput(outputId = "focal_active_funds",
+                                              width = NULL),
+                                plotlyOutput("region_remaining_committed_disbursed", height = 100)
+                              )
+                            ),
+                            column(
+                              width = 3,
+                              valueBoxOutput(outputId = "focal_grants_closing_3",
+                                             width = NULL),
+                              valueBoxOutput(outputId = "focal_grants_active_3_zero_dis",
+                                             width = NULL)
+                            ),
+                            column(
+                              width = 3,
+                              valueBoxOutput(outputId = "region_grants_may_need_transfer",
+                                             width = NULL),
+                              valueBoxOutput(outputId = "region_grants_active_no_transfer",
+                                             width = NULL)
+                            )
+                          ),
+                          tabsetPanel(
+                            tabPanel(
+                              title = "Parent Fund",
+                              plotlyOutput(outputId = "focal_region_n_grants_GG", width = 1000)
+                            ),
+                            tabPanel(title = "Global Themes",
+                                     plotlyOutput(outputId = "region_GP_GG", width = 1200))
+                          )
+                        ),
+                        tabPanel(
+                          title = "Disbursement Risk",
+                          fluidRow(
+                            plotOutput(outputId = "disbursement_risk_GG"),
+                            valueBoxOutput("low_risk", width = 3),
+                            valueBoxOutput("medium_risk", width = 3),
+                            valueBoxOutput("high_risk", width = 3),
+                            valueBoxOutput("very_high_risk", width = 3),
+                            fluidRow(column(3,offset = 1,
+                                            actionButton("generate_risk_report",
+                                           "Download Excel Report",
+                                           icon=icon("download")))
+                            )
+                          )
+                        ),
+                        tabPanel(
+                          title = "Summary Table",
+                          dateInput(
+                            "summary_table_cutoff_date",
+                            "Grants that need to be implemented by:",
+                            value = grants$`Closing Date`[which.max(grants$`Closing Date`)] %>%
+                              lubridate::as_date(),
+                            autoclose = TRUE
+                          ),
+                          DT::dataTableOutput(outputId = "region_summary_grants_table")
+                        ),
+                        tabPanel(
+                          title = "Countries",
+                          DT::dataTableOutput(outputId = "region_countries_grants_table")
+                        ),
+                        tabPanel(
+                          title = "Funding Source",
+                          DT::dataTableOutput(outputId = "region_funding_source_grants_table")
+                        ),
+                        tabPanel(
+                          title = "RETF grants",
+                          fluidRow(
+                            valueBoxOutput("RETF_n_grants_R"),
+                            valueBoxOutput("RETF_$_grants_R")
+                          ),
+                          fluidRow(plotlyOutput("RETF_trustees_R_pie"))
+                        )
+                      )
+                    )
+                  ))
 
 #tabPanel(title="RETF")
 
@@ -266,7 +333,7 @@ PMA.tab <- tabItem(tabName = "PMA",
 tab.5 <- tabItem(
   tabName = "grant_dash",
   fluidPage(
-    titlePanel("Grant Dashboard"),
+    titlePanel("Grant Summary"),
     fluidRow(
       column(width = 3,
       box(width = NULL,
@@ -295,11 +362,12 @@ tab.5 <- tabItem(
              valueBoxOutput("single_grant_m_active",width = NULL),
              valueBoxOutput("single_grant_m_disrate",width = NULL),
              valueBoxOutput("single_grant_m_to_close",width = NULL),
-             valueBoxOutput("single_grant_m_req_disrate",width = NULL)),
-      box(
-          plotlyOutput("grant_expense_GG", height = 400)),
-      box(width = 4,collapsible = T,
-        tableOutput("expense_table"))
+             valueBoxOutput("single_grant_m_req_disrate",width = NULL))
+      #,
+     # box(
+         # plotlyOutput("grant_expense_GG", height = 400)),
+     # box(width = 4,collapsible = T,
+       # tableOutput("expense_table"))
     )
   ))
 
@@ -310,7 +378,7 @@ tab.5 <- tabItem(
 tab.6 <- tabItem(
   tabName = "TTL_dashboard",
   fluidPage(
-    titlePanel("TTL Dashboard"),
+    titlePanel("TTL Summary"),
     fluidRow(
       column(width = 3,
              box(width = NULL,
@@ -335,7 +403,11 @@ tab.6 <- tabItem(
   ))
 
 ## BODY ---------------
-body <- dashboardBody(tabItems(tab.1,tab.2,tab.3,PMA.tab,tab.1.3,tab.5,tab.6))
+body <- dashboardBody( tags$head(tags$style(HTML('
+  .navbar-custom-menu>.navbar-nav>li>.dropdown-menu {
+  width:600px;
+  }
+  '))),tabItems(tab.1,tab.2,tab.3,PMA.tab,tab.1.3,tab.5,tab.6))
 
 # UI ------
 ui <- dashboardPage(header,sidebar,body)

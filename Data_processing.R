@@ -1,20 +1,28 @@
 # PACKAGES ----------------------------------------------------------------
 library(readxl)
 library(dplyr)
+library(stringi)
+library(lubridate)
 
 options(scipen = 999)
 # READ IN DATA ------------------------------------------------------------
 
-sap <- read_xlsx('SAP Data as of June 30_2019.xlsx')
-grants <- read_xlsx("GFDRR Dashoard grant level 12_2_19.xlsx")
+#NEEDS UPDATING
 
-date_data_udpated <- lubridate::as_date("19/10/08")
+grants_file <- "GFDRR Dashboard grant level 12_3_19.xlsx"
+
+sap <- read_xlsx('SAP Data as of June 30_2019.xlsx')
+grants <- read_xlsx(grants_file)
+date_data_udpated <- lubridate::mdy(stri_sub(grants_file,from = -13,-6))
 
 #dash <- read_xlsx('GFDRR Dashboard - 201910.xlsx', sheet = 3, skip = 2)
 #trustee <- read_xls('GFDRR_mg_unit.xls', skip=2)
-trustee <- read_xlsx('GFDRR Dashboard Trustee Level 10_8_19.xlsx')
-recode_trustee <- read_xlsx('recodes.xlsx',sheet=1) %>% select(-Status)
+trustee <- read_xlsx('GFDRR Trustee level 12_2_19.xlsx')
+#recode_trustee.1 <- read_xlsx('recodes.xlsx',sheet=1) %>% select(-Status)
+recode_trustee.2 <- read_xlsx("GFDRR Trustee Names.xlsx")
 recode_region <- read_xlsx('recodes.xlsx',sheet=2)
+recode_GT <- read_xlsx("Global Theme - Resp. Unit Mapping.xlsx")
+SR_grant_details <- read_xlsx("Trust_Fund_Breakdown_Table_TF4.1 Grant Details Report.xlsx",skip=3)
 
 expenses <- read.csv(file='V2_GFDRR TF Expense Details - FY18 and FY19 YTD(AutoRecovered).csv',
                      stringsAsFactors = FALSE,col.names =  c("Disbursing.Trust.Fund",
@@ -39,23 +47,35 @@ expenses <- expenses %>% mutate(Disbursements.FY.2018=as.numeric(Disbursements.F
                             Disbursements.FY.2019...YTD.Feb.2019=as.numeric(Disbursements.FY.2019...YTD.Feb.2019))
 
 #create a new df with only active trustees and with recoded names
-active_trustee <- full_join(trustee,recode_trustee,
-                            by=c('Fund'='Trustee.num')) %>%
-  filter(`Fund Status` %in% c("ACTV","ACTN"))
 
-needs <- active_trustee %>%
-  select(Fund,`Fund Name`,Trustee.name)
+trustee$still_days_to_disburse <- as.Date(trustee$`TF End Disb Date`) > today()
+active_trustee <- trustee %>% filter(still_days_to_disburse==TRUE)
 
-write.csv(needs,file="Needs_GFDRR_attention_1.csv")
-
-
-grants %>% filter(Fund %in% active_trustee$Fund)
+active_trustee <- left_join(active_trustee,recode_trustee.2,by=c("Fund"="Trustee")) %>%
+  rename("Trustee.name"=`Trustee Fund Name`)
 
 #add short region name to SAP data 
 grants <- full_join(grants,recode_region,by=c("Fund Country Region Name"='Region_Name'))
 
 #filter out grants that have 0 
 grants <- grants %>% filter(`Grant Amount USD`>0)
+grants <- grants %>% filter(`Fund Status`=="ACTV")
+
+#add lead GP/Global Themes name to SAP grant data ****This will need to be changed to dinamically account for changes***
+alt_GT <- SR_grant_details %>% select(`Grant No.`,`Lead GP/Global Themes`) %>% rename("Fund"=`Grant No.`)
+
+grants <- left_join(grants,alt_GT,by="Fund")
+
+#identify and create a new variable for grants without Global Theme
+homeless_TFs <- grants %>% filter(is.na(`Lead GP/Global Themes`)) %>% 
+  select(Fund,`TTL Unit Name`)
+
+#assign global theme to grant based on Grant TTL unit
+homed_TFs <- left_join(homeless_TFs,recode_GT,by=c("TTL Unit Name"="Resp. Unit")) %>%
+  select(Fund,`Lead GP/Global Themes`)
+
+grants$`Lead GP/Global Themes`[is.na(grants$`Lead GP/Global Themes`)] <-
+  homed_TFs$`Lead GP/Global Themes`[homed_TFs$Fund==grants$Fund[is.na(grants$`Lead GP/Global Themes`)]]
 
 #create a  new column with pseudo final TRUSTEE names to display
 #this is just in case not all desired names have been provided by GFDRR
@@ -72,7 +92,6 @@ elapsed_months <- function(end_date, start_date) {
   sd <- as.POSIXlt(start_date)
   12 * (ed$year - sd$year) + (ed$mon - sd$mon)
 }
-
 
 
 
@@ -199,13 +218,16 @@ first_date <- as_date(date_data_udpated) %>% floor_date(unit = "months")
 for (i in 1:nrow(PMA_grants)){
   
   temp_max_months <- PMA_grants$months_to_end_disbursement_static[i]
-  monthly_allocation <- (PMA_grants$unnacounted_amount[i])/temp_max_months
+  temp_max_months <- ifelse(temp_max_months==0,1,temp_max_months)
+  monthly_allocation <- (PMA_grants$unnacounted_amount[i])/(ifelse(temp_max_months>0,
+                                                                   temp_max_months,
+                                                                   1))
   
   temp_df <- data_frame(fund=rep(as.character(PMA_grants$Fund[i]),temp_max_months),
                         fund_name=rep(as.character(PMA_grants$`Fund Name`[i]),temp_max_months),
                         trustee=rep(as.character(PMA_grants$Trustee[i]),temp_max_months),
                         fund_TTL=rep(as.character(PMA_grants$`Fund TTL Name`[i]),temp_max_months),
-                        sub_date= first_date %m+% months(c(0:(temp_max_months-1))),
+                        sub_date = first_date %m+% months(c(0:(temp_max_months-1))),
                         amount=rep(monthly_allocation,temp_max_months)
   )
   

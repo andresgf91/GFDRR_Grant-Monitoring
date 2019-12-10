@@ -18,7 +18,6 @@ library(lubridate)
 library(stringi)
 library(RColorBrewer)
 
-
 # Define server logic required to draw a histogram
 server <- shinyServer(function(input,output,session) {
 
@@ -307,43 +306,53 @@ server <- shinyServer(function(input,output,session) {
         group_by(Region) %>% 
         summarise(n_grants = n(), total_award_amount = sum(`Grant Amount USD`))
       
-      plot_ly(data, labels = ~Region, values = ~total_award_amount, type = 'pie') %>%
+      plot_ly(data,
+              labels = ~Region,
+              values = ~total_award_amount,
+              text = ~percent(total_award_amount/total),
+              hoverinfo = 'label+value+text',
+              textinfo = 'text',
+              type = 'pie') %>%
         layout(xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
                yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE))
     })
+    
     
     output$funding_GP <- renderPlotly({
       
-      remove_num <- function(x){
-        word <- x
-        letter <- stri_sub(x,5)
-        if(letter %in% c("1","2","3","4","5","6","7","8","9")){
-          return(stri_sub(x,1,4))} else{
-            return(stri_sub(word))
-          }
-      }
-      
-      temp_df <- grants %>% filter(`Fund Status`=="ACTV")
-      
-      temp_df$aggregate_unit <- sapply(temp_df$`TTL Unit Name`, function(x) remove_num(x)) %>% as.vector()
-      data <- temp_df %>% 
-        group_by(`aggregate_unit`) %>% 
+      data <- grants %>% 
+        group_by(`Lead GP/Global Themes`) %>% 
         summarise(n_grants = n(), total_award_amount = sum(`Grant Amount USD`))
       
-      plot_ly(data, labels = ~aggregate_unit, values = ~total_award_amount, type = 'pie') %>%
+      total <- sum(data$total_award_amount)
+      data$percent.1 <- data$total_award_amount/total
+      
+      data$pie_name <- ifelse(data$percent.1 >=.01,data$`Lead GP/Global Themes`,"Other")
+      
+      data <- data %>% group_by(pie_name) %>%
+        summarise(n_grants=sum(n_grants),
+                  total_award_amount=sum(total_award_amount))
+      
+      plot_ly(data,
+              labels = ~pie_name,
+              values = ~total_award_amount,
+              text = ~percent(total_award_amount/total),
+              hoverinfo = 'label+value+text',
+              textinfo = 'text',
+              type = 'pie') %>%
         layout(xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
                yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE))
       
       
     })
-    
     
     
 # TAB.1.3 -------------
     output$trustee_name_TTL <- renderTable({
       active_trustee  %>% 
-        select(Fund,`Fund Name`,`Fund TTL Name`,`TF End Disb Date`) %>% 
-        mutate(`TF End Disb Date`= as.character(as_date(`TF End Disb Date`)))
+        select(Fund,`Fund Name`,`Fund TTL Name`,`TF End Disb Date`,Trustee.name) %>% 
+        mutate(`TF End Disb Date`= as.character(as_date(`TF End Disb Date`))) %>% 
+        rename("Trustee Short Name"=Trustee.name)
     },striped = T)
     
     
@@ -444,12 +453,12 @@ server <- shinyServer(function(input,output,session) {
       
       temp_df <- grants %>% filter(`DF Execution Type`=="RE")
       
-      temp_df$aggregate_unit <- sapply(temp_df$`TTL Unit Name`, function(x) remove_num(x)) %>% as.vector()
+      #temp_df$aggregate_unit <- sapply(temp_df$`TTL Unit Name`, function(x) remove_num(x)) %>% as.vector()
       data <- temp_df %>% 
-        group_by(`aggregate_unit`) %>% 
+        group_by(temp.name) %>% 
         summarise(n_grants = n(), total_award_amount = sum(`Grant Amount USD`))
       
-      plot_ly(data, labels = ~aggregate_unit, values = ~total_award_amount, type = 'pie') %>%
+      plot_ly(data, labels = ~temp.name, values = ~total_award_amount, type = 'pie') %>%
         layout(xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
                yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE))
       
@@ -477,8 +486,7 @@ server <- shinyServer(function(input,output,session) {
 # TAB.2 -------------------------------------------------------------------
 
     reactive_active_trustee <- reactive({
-      
-      #input$focal_select_region
+    
       active_trustee %>%
         filter( temp.name == input$select_trustee)
     })
@@ -752,34 +760,60 @@ server <- shinyServer(function(input,output,session) {
     
 # TAB.3 REGIONS VIEW -------------------------------------------------------------------
     
-    # temp.grants <- grants %>% filter(Region==input$focal_select_region,
-                                # `Fund Status`=="ACTV"
-    
     reactive_df <- reactive({
       
-      #input$focal_select_region
       grants %>%
-          filter(Region==input$focal_select_region,
+          filter(Region %in% input$focal_select_region,
                  `Fund Status`=="ACTV") %>% 
           filter(temp.name %in% input$focal_select_trustee) %>% 
-        filter(`DF Execution Type` %in% input$region_BE_RE)
+        filter(`DF Execution Type` %in% input$region_BE_RE) %>%
+        mutate(GPURL_binary = ifelse(`Lead GP/Global Themes`=="Urban, Resilience and Land",
+                                     "GPURL",
+                                     "Non-GPURL"))
     })
       
       reactive_df_2 <- reactive({
         
-        #input$focal_select_region
         grants %>%
-          filter(Region==input$focal_select_region,
+          filter(Region %in% input$focal_select_region,
                  `Fund Status`=="ACTV") %>% 
           filter(temp.name %in% input$focal_select_trustee) %>% 
           filter(`DF Execution Type` =="RE")
+      })
+      
+      reactive_summary <- reactive({
+        
+        grants %>%
+          filter(Region %in% input$focal_select_region,
+                 `Fund Status`=="ACTV") %>% 
+          filter(temp.name %in% input$focal_select_trustee) %>% 
+          filter(`DF Execution Type` %in% input$region_BE_RE) %>%
+          mutate(GPURL_binary = ifelse(`Lead GP/Global Themes`=="Urban, Resilience and Land",
+                                       "GPURL",
+                                       "Non-GPURL")) %>% 
+          filter(`Closing Date` < as.Date(input$"summary_table_cutoff_date"))
+        
+        
+      })
+      
+      reactive_country_regions <- reactive({
+        
+        grants %>%
+          filter(Region %in% input$focal_select_region,
+                 `Fund Status`=="ACTV") %>% 
+          filter(temp.name %in% input$focal_select_trustee) %>% 
+          filter(`DF Execution Type` %in% input$region_BE_RE) %>%
+          mutate(GPURL_binary = ifelse(`Lead GP/Global Themes`=="Urban, Resilience and Land",
+                                       "GPURL",
+                                       "Non-GPURL"))
+        
       })
     
     data <- reactiveValues(focal_grants = grants, percent_df= NA, region_grants=grants)
   
      observeEvent(input$focal_select_region,{
      data$region_grants <- grants %>%
-       filter(Region==input$focal_select_region,
+       filter(Region %in% input$focal_select_region,
               `Fund Status`=="ACTV") 
     
         updateSelectInput(session, "focal_select_trustee",label = 'Selected Trustee(s)',
@@ -825,13 +859,25 @@ server <- shinyServer(function(input,output,session) {
       if(attention_needed>0){
 
         message_list <- paste(attention_needed,
-                           "Grant(s) are closing in less than 6 months and more than 35% uncommitted balance")
+                           "Grant(s) are closing in less than 6 months and still have more than 35% uremianing balance")
 
         output$notifications_Menu <- renderMenu({
-          dropdownMenu(type ="notifications", notificationItem(text=message_list))
+          dropdownMenu(type ="messages",
+                       messageItem(message = message_list,
+                                   from = "System"))
         })
       } else {output$notifications_Menu <- NULL }
       
+    })
+    
+    
+    output$date_data_updated_message <- renderMenu({
+      dropdownMenu(type="notifications",
+                   notificationItem(text = paste("Dashboard data as of:",
+                                                 as.character(date_data_udpated),
+                                                 "(ymd)"),
+                                    icon=icon("calendar")),
+                   icon = icon("calendar"))
     })
 
     #   #subset the data by trustee selected
@@ -943,42 +989,206 @@ server <- shinyServer(function(input,output,session) {
       
       output$region_GP_GG <- renderPlotly({
         
-        remove_num <- function(x){
-          word <- x
-          letter <- stri_sub(x,5)
-          if(letter %in% c("1","2","3","4","5","6","7","8","9")){
-            return(stri_sub(x,1,4))} else{
-              return(stri_sub(word))
-            }
-        }
-      
         temp_df <- reactive_df() 
-        
-        temp_df$aggregate_unit <- sapply(temp_df$`TTL Unit Name`, function(x) remove_num(x)) %>% as.vector()
-         data <- temp_df %>% 
-          group_by(`aggregate_unit`) %>% 
-          summarise(n_grants = n(), total_award_amount = sum(`Grant Amount USD`))
   
-       plot_ly(data, labels = ~aggregate_unit, values = ~total_award_amount, type = 'pie') %>%
-          layout(xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
-                 yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE))
-        
+         data <- temp_df %>% 
+          group_by(`Lead GP/Global Themes`) %>% 
+          summarise(n_grants = n(), total_award_amount = sum(`Grant Amount USD`))
+         
+         
+         total <- sum(data$total_award_amount)
+         data$percent.1 <- data$total_award_amount/total
+         
+         data$pie_name <- ifelse(data$percent.1 >=.01,data$`Lead GP/Global Themes`,"Other")
+         
+         data <- data %>% group_by(pie_name) %>%
+           summarise(n_grants=sum(n_grants),
+                     total_award_amount=sum(total_award_amount))
+         
+         plot_ly(data,
+                 labels = ~pie_name,
+                 values = ~total_award_amount,
+                 text = ~percent(total_award_amount/total),
+                 hoverinfo = 'label+value+text',
+                 textinfo = 'text',
+                 type = 'pie') %>%
+           layout(xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+                  yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE))
         
       })
       
       output$region_countries_grants_table <- DT::renderDataTable({
         
         temp_df <- reactive_df()
-        temp_df <- temp_df %>%
+        temp_df_all <- temp_df %>%
           group_by(Country) %>%
-          summarise("Number of Active Grants" = n(),
-                    "Total Active Grants Amount" = dollar(sum(`Grant Amount USD`)),
-                    "Percent Available" = percent((sum(unnacounted_amount))/sum(`Grant Amount USD`),accuracy=1),
-                    "Avg. Monthly Disbursement Rate" = percent(mean(monthly_disbursement_rate),accuracy = 1))
+          summarise("# Grants" = n(),
+                    "$ Amount" = dollar(sum(`Grant Amount USD`)),
+                    "Balance" = dollar(sum(unnacounted_amount)))
         
-        DT::datatable(temp_df,options = list(
-          "pageLength" = 15))
+        temp_df_GPURL <-  temp_df %>% filter(GPURL_binary=="GPURL") %>% 
+          group_by(Country) %>%
+          summarise("# Grants" = n(),
+                    "$ Amount" = dollar(sum(`Grant Amount USD`)),
+                    "Balance" = dollar(sum(unnacounted_amount)))
+        
+        temp_df_non_GPURL <- temp_df %>% filter(GPURL_binary=="Non-GPURL") %>% 
+          group_by(Country) %>%
+          summarise("# Grants" = n(),
+                    "$ Amount" = dollar(sum(`Grant Amount USD`)),
+                    "Balance" = dollar(sum(unnacounted_amount)))
+        
+        
+        display_df_partial <- left_join(temp_df_GPURL,
+                                        temp_df_non_GPURL,
+                                        by="Country",
+                                        suffix=c(" (GPURL)"," (Non-GPURL)"))
+        
+        
+        display_df <- left_join(temp_df_all,display_df_partial,by="Country")
+        
+        
+        sketch <- htmltools::withTags(table(
+          class = 'display',
+          thead(
+            tr(th(colspan = 1, ''),
+               th(colspan = 1, ''),
+               th( colspan = 2, 'All'),
+               th(colspan = 1, ''),
+               th(colspan = 2, 'GPURL'),
+               th(colspan = 1, ''),
+               th(colspan = 2, 'Non-GPURL')
+            ),
+            tr(lapply(c("Trustee",rep(c("# Grants","$ Amount","Balance"),3)), th)
+            )
+          )
+        ))
+        
+        
+        DT::datatable(display_df,
+                      extensions = 'Buttons',
+                      options = list(
+          "pageLength" = 15,dom="tpB",paging=TRUE,
+          buttons = c('copy', 'csv', 'excel')),
+          container = sketch,
+          rownames = FALSE)
+        
+        
+        
+        
       })
+      
+      
+      
+      
+      output$region_funding_source_grants_table <- DT::renderDataTable({
+        
+        temp_df <- reactive_country_regions()
+        temp_df_all <- temp_df %>%
+          group_by(temp.name) %>%
+          summarise("# Grants" = n(),
+                    "$ Amount" = dollar(sum(`Grant Amount USD`)),
+                    "Balance" = dollar(sum(unnacounted_amount)))
+        
+        temp_df_GPURL <-  temp_df %>% filter(GPURL_binary=="GPURL") %>% 
+          group_by(temp.name) %>%
+          summarise("# Grants" = n(),
+                    "$ Amount" = dollar(sum(`Grant Amount USD`)),
+                    "Balance" = dollar(sum(unnacounted_amount)))
+        
+        temp_df_non_GPURL <- temp_df %>% filter(GPURL_binary=="Non-GPURL") %>% 
+          group_by(temp.name) %>%
+          summarise("# Grants" = n(),
+                    "$ Amount" = dollar(sum(`Grant Amount USD`)),
+                    "Balance" = dollar(sum(unnacounted_amount)))
+        
+        
+        display_df_partial <- left_join(temp_df_GPURL,
+                                        temp_df_non_GPURL,
+                                        by="temp.name",
+                                        suffix=c(" (GPURL)"," (Non-GPURL)"))
+        
+        
+        display_df <- left_join(temp_df_all,display_df_partial,by="temp.name")
+        
+        sketch <- htmltools::withTags(table(
+          class = 'display',
+          thead(
+            tr(th(colspan = 1, ''),
+               th(colspan = 1, ''),
+              th( colspan = 2, 'All'),
+              th(colspan = 1, ''),
+              th(colspan = 2, 'GPURL'),
+              th(colspan = 1, ''),
+               th(colspan = 2, 'Non-GPURL')
+            ),
+            tr(lapply(c("Trustee",rep(c("# Grants","$ Amount","Balance"),3)), th)
+            )
+          )
+        ))
+        
+        
+        DT::datatable(display_df,options = list(
+          "pageLength" = 15),
+          container = sketch,
+          rownames = FALSE)
+      })
+      
+      
+      output$region_summary_grants_table <- DT::renderDataTable({
+        
+        temp_df <- reactive_summary()
+        
+        sum_df_all <- temp_df %>%
+          summarise("# Grants" = n(),
+                    "$ Amount" = sum(`Grant Amount USD`),
+                    "Balance" = sum(unnacounted_amount)) %>%
+          mutate("percent"= Balance/`$ Amount`)%>% 
+          mutate(`$ Amount`= dollar(`$ Amount`,accuracy = 1),
+                 `Balance`=dollar(`Balance`,accuracy = 1),
+                 `percent`=percent(`percent`))
+        
+        sum_df_GPURL <-  temp_df %>%
+          filter(GPURL_binary=="GPURL") %>% 
+          summarise("# Grants" = n(),
+                    "$ Amount" = sum(`Grant Amount USD`),
+                    "Balance" = sum(unnacounted_amount))%>%
+          mutate("percent"= Balance/`$ Amount`)%>% 
+          mutate(`$ Amount`= dollar(`$ Amount`,accuracy = 1),
+                 `Balance`=dollar(`Balance`,accuracy = 1),
+                 `percent`=percent(`percent`))
+        
+        sum_df_non_GPURL <- temp_df %>%
+          filter(GPURL_binary=="Non-GPURL") %>% 
+          summarise("# Grants" = n(),
+                    "$ Amount" = sum(`Grant Amount USD`),
+                    "Balance" = sum(unnacounted_amount))%>%
+          mutate("percent"= Balance/`$ Amount`) %>% 
+          mutate(`$ Amount`= dollar(`$ Amount`,accuracy = 1),
+                 `Balance`=dollar(`Balance`,accuracy = 1),
+                 `percent`=percent(`percent`))
+        
+        
+        cutoff_date <- as.character(input$summary_table_cutoff_date)
+        
+        sum_display_df <- data.frame("Summary"= c("Grant Count",
+                                                  "Total $ (Million)",
+                                                  paste0("Total Uncommitted Balance ($) to Implement by ",cutoff_date),
+                                                  paste0("% Uncommitted Balance ($) to Implement by ",cutoff_date)),
+                                     "GPURL"=unname(unlist(as.list(sum_df_GPURL))),
+                                     "Non-GPURL"=unname(unlist(as.list(sum_df_non_GPURL))),
+                                     "Combined Total"=unname(unlist(as.list(sum_df_all))))
+        
+        
+        
+
+        
+        
+        DT::datatable(sum_display_df,options = list(
+          "pageLength" = 5,dom = 't'))
+      })
+      
+      
 
       output$focal_grants_active_3_zero_dis <- renderValueBox({
         
@@ -1028,7 +1238,9 @@ server <- shinyServer(function(input,output,session) {
       output$disbursement_risk_GG <- renderPlot({
        # data$focal_grants <- reactive_df()
 
-        plot_title <- paste("Disbursement Risk Overview for",input$focal_select_region,"Region")
+        plot_title <- paste("Disbursement Risk Overview for",list(input$focal_select_region),"Region(s)")
+        
+        plot_title <- stri_replace(plot_title,fixed="c","")
 
         data$focal_grants$plot_risk_name <- factor(
           data$focal_grants$disbursement_risk_level,levels = c("Low Risk",
@@ -1262,7 +1474,7 @@ server <- shinyServer(function(input,output,session) {
      data <- reactive_df()
       isolate(data <-  data %>% filter(`Fund Status` == "ACTV",
                                      `Grant Amount USD` != 0,
-                                     Region == input$focal_select_region) %>%
+                                     Region %in% input$focal_select_region) %>%
                  filter(disbursement_risk_level == 'High Risk') %>%
                 select(Fund,
                        `Fund Name`,
@@ -1452,23 +1664,29 @@ server <- shinyServer(function(input,output,session) {
     
     output$RETF_trustees_R_pie <- renderPlotly({
       
-      remove_num <- function(x){
-        word <- x
-        letter <- stri_sub(x,5)
-        if(letter %in% c("1","2","3","4","5","6","7","8","9")){
-          return(stri_sub(x,1,4))} else{
-            return(stri_sub(word))
-          }
-      }
+      temp_df <- reactive_df_2() 
       
-      temp_df <- reactive_df_2()
-      
-      temp_df$aggregate_unit <- sapply(temp_df$`TTL Unit Name`, function(x) remove_num(x)) %>% as.vector()
       data <- temp_df %>% 
-        group_by(`aggregate_unit`) %>% 
+        group_by(`Lead GP/Global Themes`) %>% 
         summarise(n_grants = n(), total_award_amount = sum(`Grant Amount USD`))
       
-      plot_ly(data, labels = ~aggregate_unit, values = ~total_award_amount, type = 'pie') %>%
+      
+      total <- sum(data$total_award_amount)
+      data$percent.1 <- data$total_award_amount/total
+      
+      data$pie_name <- ifelse(data$percent.1 >=.01,data$`Lead GP/Global Themes`,"Other")
+      
+      data <- data %>% group_by(pie_name) %>%
+        summarise(n_grants=sum(n_grants),
+                  total_award_amount=sum(total_award_amount))
+      
+      plot_ly(data,
+              labels = ~pie_name,
+              values = ~total_award_amount,
+              text = ~percent(total_award_amount/total),
+              hoverinfo = 'label+value+text',
+              textinfo = 'text',
+              type = 'pie') %>%
         layout(xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
                yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE))
       
@@ -1602,13 +1820,11 @@ server <- shinyServer(function(input,output,session) {
 # TAB.5 GRANT DASHBOARD
         
         reactive_grant <- reactive({
-          #input$focal_select_region
           grants %>%
             filter(Fund==input$child_TF_num) 
         })
         
         reactive_grant_expense <- reactive({
-          #input$focal_select_region
           data_2 %>%
             filter(child_TF==input$child_TF_num) 
         })
@@ -1739,7 +1955,7 @@ server <- shinyServer(function(input,output,session) {
         output$single_grant_m_req_disrate<- renderValueBox({
           grant <- reactive_grant()
           grant$required_disbursement_rate %>% percent() %>% 
-            valueBox(value=.,subtitle = "Months to end disbursement",color = "orange")
+            valueBox(value=.,subtitle = "Monthly required disbursement rate",color = "orange")
           
           
         })
@@ -1785,7 +2001,6 @@ server <- shinyServer(function(input,output,session) {
         
 ## TTL DASHABOARD ----------------
         reactive_TTL <- reactive({
-          #input$focal_select_region
           grants %>%
             filter(as.numeric(`Project TTL UPI`)==as.numeric(input$TTL_upi))
         })
@@ -1794,7 +2009,6 @@ server <- shinyServer(function(input,output,session) {
           
           TTL <- reactive_TTL()
           ttl_name <- TTL$`Project TTL UPI`[1]
-          #input$focal_select_region
           data_2 %>%
             filter(TTL==ttl_name) 
         })

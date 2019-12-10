@@ -4,26 +4,27 @@ library(readxl)
 recode_GP <- read_xlsx("Trust_Fund_Breakdown_Table_TF4.1 Grant Details Report.xlsx",skip=3)
 
 
-
-unit_global.theme <- recode_GP %>%
+Global.Theme_Resp.Unit <- recode_GP %>%
+  filter(`Grant No.` %in% grants$Fund)  %>%
   filter(`Fund Status`=="ACTIVE") %>%
-  select(`Grant Managing Unit`,`Lead GP/Global Themes`) %>%
-  group_by(`Grant Managing Unit`,`Lead GP/Global Themes`) %>%
-  distinct() %>% 
-  arrange(`Lead GP/Global Themes`)
+  select(`Resp. Unit`,`Lead GP/Global Themes`) %>% 
+  group_by(`Resp. Unit`,`Lead GP/Global Themes`) %>%
+  dplyr::distinct() %>% 
+  arrange(`Resp. Unit`)
+
+write.csv(Global.Theme_Resp.Unit,file="Global Theme - Resp. Unit Mapping.csv")       
 
 
-View(unit_global.theme)
+unit_managers <- recode_GP %>%
+  filter(`Grant No.` %in% grants$Fund)  %>%
+  filter(`Fund Status`=="ACTIVE") %>%
+  select(`Grant Managing Unit`,`Practice Manager`) %>% 
+  group_by(`Grant Managing Unit`,`Practice Manager`) %>%
+  dplyr::distinct() %>% 
+  arrange(`Grant Managing Unit`)
 
-na.1 <- unit_global.theme %>% filter(is.na(`Lead GP/Global Themes`))
-na.2 <- unit_global.theme %>% filter(!is.na(`Lead GP/Global Themes`))
 
+unit_managers <-  unit_managers[complete.cases(unit_managers), ]
 
+write.csv(unit_managers,file="Managers - Units.csv")       
 
-# for (i in na.1$`Grant Managing Unit`) {
-#   if(i in na.2$`Grant Managing Unit`){
-#     unit_global.theme$`Lead GP/Global Themes`[unit_global.theme$`Grant Managing Unit`==i] <-  
-#   }
-# }
-
-na.1$`Grant Managing Unit`[which(!(na.1$`Grant Managing Unit` %in% na.2$`Grant Managing Unit`))]

@@ -69,20 +69,26 @@ tab.1 <-  tabItem(tabName = "overview",
                             fluidRow(
   column(width=3,
          infoBoxOutput("total_contributions",width = NULL),
-         infoBoxOutput("total_received",width = NULL),
-         infoBoxOutput("total_unpaid",width = NULL)),
+         infoBoxOutput("total_received",width = NULL)),
   column(width=3,
-         valueBoxOutput("number_active_grants",width = NULL),
-         infoBoxOutput("total_remaining_balance",width = NULL),
-         plotlyOutput("overview_progress_GG",height = 100)),
-  column(width=3,
-         valueBoxOutput("number_active_grants_op",width = NULL),
-         infoBoxOutput("total_remaining_balance_op",width = NULL),
-         plotlyOutput("overview_progress_GG_op",height = 100)),
-  column(width=3,
-         valueBoxOutput("number_active_grants_pma",width = NULL),
-         infoBoxOutput("closing<12",width = NULL),
-         infoBoxOutput("closing<6",width = NULL))),
+         infoBoxOutput("total_unpaid",width = NULL),
+         infoBoxOutput("closing<12",width = NULL)),
+  column(width=6,tabsetPanel(
+    tabPanel("All Active Grants", fluidRow(
+         valueBoxOutput("number_active_grants",width = 5),
+         infoBoxOutput("total_remaining_balance",width=7)),
+         fluidRow(
+         plotlyOutput("overview_progress_GG",height = 90))),
+  tabPanel("Operational Grants",
+           fluidRow(
+         valueBoxOutput("number_active_grants_op",width = 5),
+         infoBoxOutput("total_remaining_balance_op",width = 7)),
+         plotlyOutput("overview_progress_GG_op",height = 90)),
+  tabPanel("PMA Grants",
+           fluidRow(
+         valueBoxOutput("number_active_grants_pma",width = 5),
+         infoBoxOutput("total_remaining_balance_pma",width = 7)),
+         plotlyOutput("overview_progress_GG_pma",height = 90)))),
   fluidRow(tabsetPanel(
     tabPanel("Contributions by Trustee",
              plotlyOutput("plot1", height = 450)),
@@ -91,7 +97,7 @@ tab.1 <-  tabItem(tabName = "overview",
     tabPanel("Active Funding per Region",
              plotlyOutput("funding_region",height=450)),
     tabPanel("Active Funding by Global Theme",
-             plotlyOutput("funding_GP",height=450))))))
+             plotlyOutput("funding_GP",height=450)))))))
 
 # tab 1.3 ------
 tab.1.3 <-  tabItem(tabName = "admin_info",
@@ -188,12 +194,6 @@ tab.3 <-  tabItem(tabName = "regions",
                           selected = sort(unique(grants$Region))
                         )
                       )),
-                      
-                      # column(width = 4, box(
-                      #   title = 'Region',
-                      #   textOutput('focal_region_name'),
-                      #   width = NULL
-                      # )),
                       column(width = 6, wellPanel(
                         selectInput(
                           'focal_select_trustee',
@@ -280,15 +280,30 @@ tab.3 <-  tabItem(tabName = "regions",
                               lubridate::as_date(),
                             autoclose = TRUE
                           ),
-                          DT::dataTableOutput(outputId = "region_summary_grants_table")
+                          DT::dataTableOutput(outputId = "region_summary_grants_table"),
+                          fluidRow(column(3,offset = 1,
+                                          actionButton("generate_full_excel_report_1",
+                                                       "Open test version excel Report",
+                                                       icon=icon("download")))
+                          )
                         ),
                         tabPanel(
                           title = "Countries",
-                          DT::dataTableOutput(outputId = "region_countries_grants_table")
+                          DT::dataTableOutput(outputId = "region_countries_grants_table"),
+                          fluidRow(column(3,offset = 1,
+                                          actionButton("generate_full_excel_report_2",
+                                                       "Open test version excel Report",
+                                                       icon=icon("download")))
+                          )
                         ),
                         tabPanel(
                           title = "Funding Source",
-                          DT::dataTableOutput(outputId = "region_funding_source_grants_table")
+                          DT::dataTableOutput(outputId = "region_funding_source_grants_table"),
+                          fluidRow(column(3,offset = 1,
+                                          actionButton("generate_full_excel_report_3",
+                                                       "Open test version excel Report",
+                                                       icon=icon("download")))
+                          )
                         ),
                         tabPanel(
                           title = "RETF grants",

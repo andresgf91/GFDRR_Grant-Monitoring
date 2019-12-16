@@ -40,7 +40,7 @@ server <- shinyServer(function(input,output,session) {
       sum(active_trustee$`Net Paid-In Condribution in USD`) %>% 
       dollar() %>% 
       infoBox(
-        "Total Contributions Received", ., icon = icon("hand-holding-usd"),
+        "Total Received", ., icon = icon("hand-holding-usd"),
         color = "blue", subtitle = "*all active trustees")
       
       })
@@ -61,7 +61,7 @@ server <- shinyServer(function(input,output,session) {
       sum(temp_grants$unnacounted_amount) %>% 
       dollar()%>% 
         infoBox(
-          "Total Remaining Balance", ., icon = icon("receipt"),
+          "Remaining Balance", ., icon = icon("receipt"),
           color = "blue", subtitle = "*all active grants")
       })
     
@@ -153,7 +153,7 @@ server <- shinyServer(function(input,output,session) {
         valueBox(.,
           subtitle = "All Active Grants",
           icon = icon("list-ol"),
-          color = "green")
+          color = "blue")
     })
     
     
@@ -167,7 +167,7 @@ server <- shinyServer(function(input,output,session) {
         valueBox(.,
                  subtitle = "Active Operational Grants",
                  icon = icon("list-ol"),
-                 color = "blue")
+                 color = "green")
     })
     
     
@@ -178,8 +178,8 @@ server <- shinyServer(function(input,output,session) {
       sum(temp_grants$unnacounted_amount) %>% 
         dollar()%>% 
         infoBox(
-          "Total Remaining Balance", ., icon = icon("receipt"),
-          color = "blue", subtitle = "*operational grants")
+          "Remaining Balance", ., icon = icon("receipt"),
+          color = "green", subtitle = "*operational grants")
     })
     
   
@@ -230,7 +230,6 @@ server <- shinyServer(function(input,output,session) {
                              font = list(size = 10),
                              x=.2, y = -4,
                              traceorder="reversed"))
-      
     })
     
     
@@ -245,6 +244,67 @@ server <- shinyServer(function(input,output,session) {
                  icon = icon("list-ol"),
                  color = "yellow")
     })
+    
+    output$total_remaining_balance_pma <- renderInfoBox({
+      
+      temp_grants <- grants %>% filter(Trustee %in% active_trustee$Fund,
+                                       `Fund Status`=="ACTV",PMA=="yes")
+      sum(temp_grants$unnacounted_amount) %>% 
+        dollar()%>% 
+        infoBox(
+          "Remaining Balance", ., icon = icon("receipt"),
+          color = "yellow", subtitle = "*PMA grants")
+    })
+    
+    output$overview_progress_GG_pma <- renderPlotly({
+      
+      temp_df <- grants %>% filter(`Fund Status`=="ACTV",PMA=="yes")
+      
+      new_df <- data.frame(Disbursed=sum(temp_df$`Disbursements USD`),
+                           Committed=sum(temp_df$`Commitments USD`),
+                           "Remaining"=sum(temp_df$unnacounted_amount)) %>% 
+        reshape2::melt() %>%
+        mutate(total=sum(temp_df$`Grant Amount USD`)) %>%
+        mutate(percent=value/total)
+      
+      gg <- new_df %>% ggplot(aes(x=total,
+                                  y=value,
+                                  fill=variable,
+                                  label=percent(percent),
+                                  text=paste(variable,"\n",
+                                             "USD Amount:",dollar(value),"\n",
+                                             "Percentage of Total:",percent(percent)))) +
+        geom_bar(stat='identity',position = 'stack') +
+        # coord_flip() +
+        theme_minimal() +
+        labs(y="USD Amount")+
+        theme(axis.title.y = element_blank(),
+              axis.text.y = element_blank(),
+              axis.ticks.y = element_blank(),
+              panel.background = element_blank(),
+              panel.grid = element_blank(),
+              axis.text.x = element_blank(),
+              axis.ticks.x = element_blank()) +
+        theme(#legend.direction = "horizontal",
+          legend.position = 'bottom',
+          legend.title = element_blank(),
+          axis.title.x = element_blank(),
+          plot.margin = unit(c(0,0,0,0), "cm")) +
+        coord_flip() +
+        scale_fill_discrete(breaks=c("Remaining","Committed","Disbursed")) +
+        scale_fill_brewer(palette = "Blues") +
+        geom_text(size = 3, position = position_stack(vjust = 0.5),) 
+      
+      plotly::ggplotly(gg, tooltip = "text") %>%
+        layout(legend = list(orientation = 'h',
+                             font = list(size = 10),
+                             x=.2, y = -4,
+                             traceorder="reversed"))
+    })
+    
+    
+    
+    
     
     
     output$region_GP_GG <- renderPlotly({
@@ -289,7 +349,8 @@ server <- shinyServer(function(input,output,session) {
                               dollar(total_award_amount)))) +
         geom_col(fill='royalblue',alpha=.7) +
         theme_classic() +
-        labs(x="Region", y="Number of Grants",title="Active Operational Grants by Region")+
+        labs(x="Region", y="Number of Grants",
+             title="Active Operational Grants by Region")+
         theme(rect = element_rect(fill="transparent"),
               plot.background = element_rect(fill="transparent",color=NA),
               panel.background = element_rect(fill="transparent")) 
@@ -301,10 +362,13 @@ server <- shinyServer(function(input,output,session) {
     
     output$funding_region <- renderPlotly({
       
-      temp_df <- grants %>% filter(`Fund Status`=="ACTV")
+      temp_df <- grants %>%
+        filter(`Fund Status`=="ACTV")
       data <- temp_df %>% 
         group_by(Region) %>% 
         summarise(n_grants = n(), total_award_amount = sum(`Grant Amount USD`))
+      
+      total <- sum(data$total_award_amount)
       
       plot_ly(data,
               labels = ~Region,
@@ -859,7 +923,7 @@ server <- shinyServer(function(input,output,session) {
       if(attention_needed>0){
 
         message_list <- paste(attention_needed,
-                           "Grant(s) are closing in less than 6 months and still have more than 35% uremianing balance")
+                           "Grant(s) are closing in less than 6 months and still have more than 35% remaining balance")
 
         output$notifications_Menu <- renderMenu({
           dropdownMenu(type ="messages",
@@ -909,10 +973,7 @@ server <- shinyServer(function(input,output,session) {
           infoBox(title = "Total Active Awards",value = . , color = 'green')
       })
       
-      
-      
-      
-      
+
       output$region_remaining_committed_disbursed <- renderPlotly({
         
         temp_df <- reactive_df()
@@ -959,7 +1020,6 @@ server <- shinyServer(function(input,output,session) {
                                traceorder="reversed"))
       
       })
-
 
       output$focal_region_n_grants_GG <- renderPlotly({
         
@@ -1039,7 +1099,7 @@ server <- shinyServer(function(input,output,session) {
                     "Balance" = dollar(sum(unnacounted_amount)))
         
         
-        display_df_partial <- left_join(temp_df_GPURL,
+        display_df_partial <- full_join(temp_df_GPURL,
                                         temp_df_non_GPURL,
                                         by="Country",
                                         suffix=c(" (GPURL)"," (Non-GPURL)"))
@@ -1064,23 +1124,34 @@ server <- shinyServer(function(input,output,session) {
           )
         ))
         
+        DT::datatable( data = display_df,
+                       extensions = 'Buttons',
+                       options = list( 
+                         dom = "Blfrtip",
+                         paging=TRUE,
+                         buttons = 
+                           list("copy",
+                                list(
+                                  extend = "collection",
+                                  buttons = c("csv", "excel", "pdf"),
+                                  text = "Download"))
+                         
+                           # end of buttons customization
+                         
+                         # customize the length menu
+                         , lengthMenu = list( c(10, 20, -1) # declare values
+                                              , c(10, 20, "All") # declare titles
+                         ) # end of lengthMenu customization
+                         , pageLength = 10
+                         
+                         
+                       ),
+                       container=sketch,
+                       rownames=FALSE # end of options
+                       
+            ) # end of datatables
+        }) # 
         
-        DT::datatable(display_df,
-                      extensions = 'Buttons',
-                      options = list(
-          "pageLength" = 15,dom="tpB",paging=TRUE,
-          buttons = c('copy', 'csv', 'excel')),
-          container = sketch,
-          rownames = FALSE)
-        
-        
-        
-        
-      })
-      
-      
-      
-      
       output$region_funding_source_grants_table <- DT::renderDataTable({
         
         temp_df <- reactive_country_regions()
@@ -1103,13 +1174,13 @@ server <- shinyServer(function(input,output,session) {
                     "Balance" = dollar(sum(unnacounted_amount)))
         
         
-        display_df_partial <- left_join(temp_df_GPURL,
+        display_df_partial <- full_join(temp_df_GPURL,
                                         temp_df_non_GPURL,
                                         by="temp.name",
                                         suffix=c(" (GPURL)"," (Non-GPURL)"))
         
         
-        display_df <- left_join(temp_df_all,display_df_partial,by="temp.name")
+        display_df_funding <- left_join(temp_df_all,display_df_partial,by="temp.name")
         
         sketch <- htmltools::withTags(table(
           class = 'display',
@@ -1128,10 +1199,32 @@ server <- shinyServer(function(input,output,session) {
         ))
         
         
-        DT::datatable(display_df,options = list(
-          "pageLength" = 15),
-          container = sketch,
-          rownames = FALSE)
+        DT::datatable( data = display_df_funding,
+                       extensions = 'Buttons',
+                       options = list( 
+                         dom = "Blfrtip",
+                         paging=TRUE,
+                         buttons = 
+                           list("copy",
+                                list(
+                                  extend = "collection",
+                                  buttons = c("csv", "excel", "pdf"),
+                                  text = "Download"))
+                         
+                         # end of buttons customization
+                         
+                         # customize the length menu
+                         , lengthMenu = list( c(10, 20, -1) # declare values
+                                              , c(10, 20, "All") # declare titles
+                         ) # end of lengthMenu customization
+                         , pageLength = 10
+                         
+                         
+                       ),
+                       container=sketch,
+                       rownames=FALSE # end of options
+                       
+        )
       })
       
       
@@ -1182,18 +1275,450 @@ server <- shinyServer(function(input,output,session) {
         
         
 
-        
-        
-        DT::datatable(sum_display_df,options = list(
-          "pageLength" = 5,dom = 't'))
+        DT::datatable( data = sum_display_df,
+                       extensions = 'Buttons',
+                       options = list( 
+                         dom = "Blfrtip",
+                         paging=TRUE,
+                         buttons = 
+                           list("copy",
+                                list(
+                                  extend = "collection",
+                                  buttons = c("csv", "excel", "pdf"),
+                                  text = "Download Displayed Table"))
+                         
+                         # end of buttons customization
+                          # end of lengthMenu customization
+                         , pageLength = 5
+                         
+                         
+                       )# end of options
+                       
+        )
       })
       
       
+      observeEvent(input$generate_full_excel_report_1,{
+  # -------- SUMMARY DF -----------       
+        
+        temp_df <- reactive_summary()
+        
+        sum_df_all <- temp_df %>%
+          summarise("# Grants" = n(),
+                    "$ Amount" = sum(`Grant Amount USD`),
+                    "Balance" = sum(unnacounted_amount)) %>%
+          mutate("percent"= Balance/`$ Amount`)%>% 
+          mutate(`$ Amount`= dollar(`$ Amount`,accuracy = 1),
+                 `Balance`=dollar(`Balance`,accuracy = 1),
+                 `percent`=percent(`percent`))
+        
+        sum_df_GPURL <-  temp_df %>%
+          filter(GPURL_binary=="GPURL") %>% 
+          summarise("# Grants" = n(),
+                    "$ Amount" = sum(`Grant Amount USD`),
+                    "Balance" = sum(unnacounted_amount))%>%
+          mutate("percent"= Balance/`$ Amount`)%>% 
+          mutate(`$ Amount`= dollar(`$ Amount`,accuracy = 1),
+                 `Balance`=dollar(`Balance`,accuracy = 1),
+                 `percent`=percent(`percent`))
+        
+        sum_df_non_GPURL <- temp_df %>%
+          filter(GPURL_binary=="Non-GPURL") %>% 
+          summarise("# Grants" = n(),
+                    "$ Amount" = sum(`Grant Amount USD`),
+                    "Balance" = sum(unnacounted_amount))%>%
+          mutate("percent"= Balance/`$ Amount`) %>% 
+          mutate(`$ Amount`= dollar(`$ Amount`,accuracy = 1),
+                 `Balance`=dollar(`Balance`,accuracy = 1),
+                 `percent`=percent(`percent`))
+        
+        
+        cutoff_date <- as.character(input$summary_table_cutoff_date)
+        
+        sum_display_df <- data.frame("Summary"= c("Grant Count",
+                                                  "Total $ (Million)",
+                                                  paste0("Total Uncommitted Balance ($) to Implement by ",cutoff_date),
+                                                  paste0("% Uncommitted Balance ($) to Implement by ",cutoff_date)),
+                                     "GPURL"=unname(unlist(as.list(sum_df_GPURL))),
+                                     "Non-GPURL"=unname(unlist(as.list(sum_df_non_GPURL))),
+                                     "Combined Total"=unname(unlist(as.list(sum_df_all))))
+        
+        
+  #---------COUNTRIES DF ----------------------
+        temp_df <- reactive_df()
+        temp_df_all <- temp_df %>%
+          group_by(Country) %>%
+          summarise("# Grants" = n(),
+                    "$ Amount" = dollar(sum(`Grant Amount USD`)),
+                    "Balance" = dollar(sum(unnacounted_amount)))
+        
+        temp_df_GPURL <-  temp_df %>% filter(GPURL_binary=="GPURL") %>% 
+          group_by(Country) %>%
+          summarise("# Grants" = n(),
+                    "$ Amount" = dollar(sum(`Grant Amount USD`)),
+                    "Balance" = dollar(sum(unnacounted_amount)))
+        
+        temp_df_non_GPURL <- temp_df %>% filter(GPURL_binary=="Non-GPURL") %>% 
+          group_by(Country) %>%
+          summarise("# Grants" = n(),
+                    "$ Amount" = dollar(sum(`Grant Amount USD`)),
+                    "Balance" = dollar(sum(unnacounted_amount)))
+        
+        
+        display_df_partial <- full_join(temp_df_GPURL,
+                                        temp_df_non_GPURL,
+                                        by="Country",
+                                        suffix=c(" (GPURL)"," (Non-GPURL)"))
+        
+        
+        display_df <- left_join(temp_df_all,display_df_partial,by="Country")
+        
+        
+  #---------FUNDING SOURCE DF ----------------------
+        
+        temp_df <- reactive_country_regions()
+        temp_df_all <- temp_df %>%
+          group_by(temp.name) %>%
+          summarise("# Grants" = n(),
+                    "$ Amount" = dollar(sum(`Grant Amount USD`)),
+                    "Balance" = dollar(sum(unnacounted_amount)))
+        
+        temp_df_GPURL <-  temp_df %>% filter(GPURL_binary=="GPURL") %>% 
+          group_by(temp.name) %>%
+          summarise("# Grants" = n(),
+                    "$ Amount" = dollar(sum(`Grant Amount USD`)),
+                    "Balance" = dollar(sum(unnacounted_amount)))
+        
+        temp_df_non_GPURL <- temp_df %>% filter(GPURL_binary=="Non-GPURL") %>% 
+          group_by(temp.name) %>%
+          summarise("# Grants" = n(),
+                    "$ Amount" = dollar(sum(`Grant Amount USD`)),
+                    "Balance" = dollar(sum(unnacounted_amount)))
+        
+        
+        display_df_partial <- full_join(temp_df_GPURL,
+                                        temp_df_non_GPURL,
+                                        by="temp.name",
+                                        suffix=c(" (GPURL)"," (Non-GPURL)"))
+        
+        
+        display_df_funding <- left_join(temp_df_all,display_df_partial,by="temp.name")
+        
+  #------ CREATE EXCEL WORKBOOK AND ADD DATAFRAMES -------
+        require(openxlsx)
+        wb <- createWorkbook()
+        
+        #temp_df <- reactive_df()
+        report_title <- paste("Test Version -- Summary Report for","unique(temp_df$Region)","Region(s)")
+        
+        addWorksheet(wb, "Portfolio Summary")
+       # mergeCells(wb,1,c(2,3,4),1)
+        
+        writeData(wb, 1,
+                  report_title,
+                  startRow = 1,
+                  startCol = 2)
+        
+        writeDataTable(wb, 1,  sum_display_df, startRow = 3, startCol = 2, withFilter = F)
+        writeDataTable(wb, 1,  display_df, startRow = 5+(nrow(sum_display_df)+2), startCol = 2,withFilter = F)
+        writeDataTable(wb, 1,  display_df_funding, startRow = 15 + nrow(display_df), startCol = 2,withFilter = F)
+        
+        
+        setColWidths(wb, 1, cols = 1:ncol(display_df)+1, widths = "auto")
+        # header_style <- createStyle(borderColour = getOption("openxlsx.borderColour", "black"),
+        #                             borderStyle = getOption("openxlsx.borderStyle", "thick"),
+        #                             halign = 'center',
+        #                             valign = 'center',
+        #                             textDecoration = NULL,
+        #                             wrapText = TRUE)
+        # 
+        # addStyle(wb,1,rows=3,cols=2:length(sum_display_df)+1,style = header_style)
+        # 
+        ## opens a temp version
+        openXL(wb)
+        })
+      observeEvent(input$generate_full_excel_report_2,{
+        # -------- SUMMARY DF -----------       
+        
+        temp_df <- reactive_summary()
+        
+        sum_df_all <- temp_df %>%
+          summarise("# Grants" = n(),
+                    "$ Amount" = sum(`Grant Amount USD`),
+                    "Balance" = sum(unnacounted_amount)) %>%
+          mutate("percent"= Balance/`$ Amount`)%>% 
+          mutate(`$ Amount`= dollar(`$ Amount`,accuracy = 1),
+                 `Balance`=dollar(`Balance`,accuracy = 1),
+                 `percent`=percent(`percent`))
+        
+        sum_df_GPURL <-  temp_df %>%
+          filter(GPURL_binary=="GPURL") %>% 
+          summarise("# Grants" = n(),
+                    "$ Amount" = sum(`Grant Amount USD`),
+                    "Balance" = sum(unnacounted_amount))%>%
+          mutate("percent"= Balance/`$ Amount`)%>% 
+          mutate(`$ Amount`= dollar(`$ Amount`,accuracy = 1),
+                 `Balance`=dollar(`Balance`,accuracy = 1),
+                 `percent`=percent(`percent`))
+        
+        sum_df_non_GPURL <- temp_df %>%
+          filter(GPURL_binary=="Non-GPURL") %>% 
+          summarise("# Grants" = n(),
+                    "$ Amount" = sum(`Grant Amount USD`),
+                    "Balance" = sum(unnacounted_amount))%>%
+          mutate("percent"= Balance/`$ Amount`) %>% 
+          mutate(`$ Amount`= dollar(`$ Amount`,accuracy = 1),
+                 `Balance`=dollar(`Balance`,accuracy = 1),
+                 `percent`=percent(`percent`))
+        
+        
+        cutoff_date <- as.character(input$summary_table_cutoff_date)
+        
+        sum_display_df <- data.frame("Summary"= c("Grant Count",
+                                                  "Total $ (Million)",
+                                                  paste0("Total Uncommitted Balance ($) to Implement by ",cutoff_date),
+                                                  paste0("% Uncommitted Balance ($) to Implement by ",cutoff_date)),
+                                     "GPURL"=unname(unlist(as.list(sum_df_GPURL))),
+                                     "Non-GPURL"=unname(unlist(as.list(sum_df_non_GPURL))),
+                                     "Combined Total"=unname(unlist(as.list(sum_df_all))))
+        
+        
+        #---------COUNTRIES DF ----------------------
+        temp_df <- reactive_df()
+        temp_df_all <- temp_df %>%
+          group_by(Country) %>%
+          summarise("# Grants" = n(),
+                    "$ Amount" = dollar(sum(`Grant Amount USD`)),
+                    "Balance" = dollar(sum(unnacounted_amount)))
+        
+        temp_df_GPURL <-  temp_df %>% filter(GPURL_binary=="GPURL") %>% 
+          group_by(Country) %>%
+          summarise("# Grants" = n(),
+                    "$ Amount" = dollar(sum(`Grant Amount USD`)),
+                    "Balance" = dollar(sum(unnacounted_amount)))
+        
+        temp_df_non_GPURL <- temp_df %>% filter(GPURL_binary=="Non-GPURL") %>% 
+          group_by(Country) %>%
+          summarise("# Grants" = n(),
+                    "$ Amount" = dollar(sum(`Grant Amount USD`)),
+                    "Balance" = dollar(sum(unnacounted_amount)))
+        
+        
+        display_df_partial <- full_join(temp_df_GPURL,
+                                        temp_df_non_GPURL,
+                                        by="Country",
+                                        suffix=c(" (GPURL)"," (Non-GPURL)"))
+        
+        
+        display_df <- left_join(temp_df_all,display_df_partial,by="Country")
+        
+        
+        #---------FUNDING SOURCE DF ----------------------
+        
+        temp_df <- reactive_country_regions()
+        temp_df_all <- temp_df %>%
+          group_by(temp.name) %>%
+          summarise("# Grants" = n(),
+                    "$ Amount" = dollar(sum(`Grant Amount USD`)),
+                    "Balance" = dollar(sum(unnacounted_amount)))
+        
+        temp_df_GPURL <-  temp_df %>% filter(GPURL_binary=="GPURL") %>% 
+          group_by(temp.name) %>%
+          summarise("# Grants" = n(),
+                    "$ Amount" = dollar(sum(`Grant Amount USD`)),
+                    "Balance" = dollar(sum(unnacounted_amount)))
+        
+        temp_df_non_GPURL <- temp_df %>% filter(GPURL_binary=="Non-GPURL") %>% 
+          group_by(temp.name) %>%
+          summarise("# Grants" = n(),
+                    "$ Amount" = dollar(sum(`Grant Amount USD`)),
+                    "Balance" = dollar(sum(unnacounted_amount)))
+        
+        
+        display_df_partial <- full_join(temp_df_GPURL,
+                                        temp_df_non_GPURL,
+                                        by="temp.name",
+                                        suffix=c(" (GPURL)"," (Non-GPURL)"))
+        
+        
+        display_df_funding <- left_join(temp_df_all,display_df_partial,by="temp.name")
+        
+        #------ CREATE EXCEL WORKBOOK AND ADD DATAFRAMES -------
+        require(openxlsx)
+        wb <- createWorkbook()
+        
+        #temp_df <- reactive_df()
+        report_title <- paste("Test Version -- Summary Report for","unique(temp_df$Region)","Region(s)")
+        
+        addWorksheet(wb, "Portfolio Summary")
+        # mergeCells(wb,1,c(2,3,4),1)
+        
+        writeData(wb, 1,
+                  report_title,
+                  startRow = 1,
+                  startCol = 2)
+        
+        writeDataTable(wb, 1,  sum_display_df, startRow = 3, startCol = 2, withFilter = F)
+        writeDataTable(wb, 1,  display_df, startRow = 5+(nrow(sum_display_df)+2), startCol = 2,withFilter = F)
+        writeDataTable(wb, 1,  display_df_funding, startRow = 15 + nrow(display_df), startCol = 2,withFilter = F)
+        
+        
+        setColWidths(wb, 1, cols = 1:ncol(display_df)+1, widths = "auto")
+        # header_style <- createStyle(borderColour = getOption("openxlsx.borderColour", "black"),
+        #                             borderStyle = getOption("openxlsx.borderStyle", "thick"),
+        #                             halign = 'center',
+        #                             valign = 'center',
+        #                             textDecoration = NULL,
+        #                             wrapText = TRUE)
+        # 
+        # addStyle(wb,1,rows=3,cols=2:length(sum_display_df)+1,style = header_style)
+        # 
+        ## opens a temp version
+        openXL(wb)
+      })
+      observeEvent(input$generate_full_excel_report_3,{
+        # -------- SUMMARY DF -----------       
+        
+        temp_df <- reactive_summary()
+        
+        sum_df_all <- temp_df %>%
+          summarise("# Grants" = n(),
+                    "$ Amount" = sum(`Grant Amount USD`),
+                    "Balance" = sum(unnacounted_amount)) %>%
+          mutate("percent"= Balance/`$ Amount`)%>% 
+          mutate(`$ Amount`= dollar(`$ Amount`,accuracy = 1),
+                 `Balance`=dollar(`Balance`,accuracy = 1),
+                 `percent`=percent(`percent`))
+        
+        sum_df_GPURL <-  temp_df %>%
+          filter(GPURL_binary=="GPURL") %>% 
+          summarise("# Grants" = n(),
+                    "$ Amount" = sum(`Grant Amount USD`),
+                    "Balance" = sum(unnacounted_amount))%>%
+          mutate("percent"= Balance/`$ Amount`)%>% 
+          mutate(`$ Amount`= dollar(`$ Amount`,accuracy = 1),
+                 `Balance`=dollar(`Balance`,accuracy = 1),
+                 `percent`=percent(`percent`))
+        
+        sum_df_non_GPURL <- temp_df %>%
+          filter(GPURL_binary=="Non-GPURL") %>% 
+          summarise("# Grants" = n(),
+                    "$ Amount" = sum(`Grant Amount USD`),
+                    "Balance" = sum(unnacounted_amount))%>%
+          mutate("percent"= Balance/`$ Amount`) %>% 
+          mutate(`$ Amount`= dollar(`$ Amount`,accuracy = 1),
+                 `Balance`=dollar(`Balance`,accuracy = 1),
+                 `percent`=percent(`percent`))
+        
+        
+        cutoff_date <- as.character(input$summary_table_cutoff_date)
+        
+        sum_display_df <- data.frame("Summary"= c("Grant Count",
+                                                  "Total $ (Million)",
+                                                  paste0("Total Uncommitted Balance ($) to Implement by ",cutoff_date),
+                                                  paste0("% Uncommitted Balance ($) to Implement by ",cutoff_date)),
+                                     "GPURL"=unname(unlist(as.list(sum_df_GPURL))),
+                                     "Non-GPURL"=unname(unlist(as.list(sum_df_non_GPURL))),
+                                     "Combined Total"=unname(unlist(as.list(sum_df_all))))
+        
+        
+        #---------COUNTRIES DF ----------------------
+        temp_df <- reactive_df()
+        temp_df_all <- temp_df %>%
+          group_by(Country) %>%
+          summarise("# Grants" = n(),
+                    "$ Amount" = dollar(sum(`Grant Amount USD`)),
+                    "Balance" = dollar(sum(unnacounted_amount)))
+        
+        temp_df_GPURL <-  temp_df %>% filter(GPURL_binary=="GPURL") %>% 
+          group_by(Country) %>%
+          summarise("# Grants" = n(),
+                    "$ Amount" = dollar(sum(`Grant Amount USD`)),
+                    "Balance" = dollar(sum(unnacounted_amount)))
+        
+        temp_df_non_GPURL <- temp_df %>% filter(GPURL_binary=="Non-GPURL") %>% 
+          group_by(Country) %>%
+          summarise("# Grants" = n(),
+                    "$ Amount" = dollar(sum(`Grant Amount USD`)),
+                    "Balance" = dollar(sum(unnacounted_amount)))
+        
+        
+        display_df_partial <- full_join(temp_df_GPURL,
+                                        temp_df_non_GPURL,
+                                        by="Country",
+                                        suffix=c(" (GPURL)"," (Non-GPURL)"))
+        
+        
+        display_df <- left_join(temp_df_all,display_df_partial,by="Country")
+        
+        
+        #---------FUNDING SOURCE DF ----------------------
+        
+        temp_df <- reactive_country_regions()
+        temp_df_all <- temp_df %>%
+          group_by(temp.name) %>%
+          summarise("# Grants" = n(),
+                    "$ Amount" = dollar(sum(`Grant Amount USD`)),
+                    "Balance" = dollar(sum(unnacounted_amount)))
+        
+        temp_df_GPURL <-  temp_df %>% filter(GPURL_binary=="GPURL") %>% 
+          group_by(temp.name) %>%
+          summarise("# Grants" = n(),
+                    "$ Amount" = dollar(sum(`Grant Amount USD`)),
+                    "Balance" = dollar(sum(unnacounted_amount)))
+        
+        temp_df_non_GPURL <- temp_df %>% filter(GPURL_binary=="Non-GPURL") %>% 
+          group_by(temp.name) %>%
+          summarise("# Grants" = n(),
+                    "$ Amount" = dollar(sum(`Grant Amount USD`)),
+                    "Balance" = dollar(sum(unnacounted_amount)))
+        
+        
+        display_df_partial <- full_join(temp_df_GPURL,
+                                        temp_df_non_GPURL,
+                                        by="temp.name",
+                                        suffix=c(" (GPURL)"," (Non-GPURL)"))
+        
+        
+        display_df_funding <- left_join(temp_df_all,display_df_partial,by="temp.name")
+        
+        #------ CREATE EXCEL WORKBOOK AND ADD DATAFRAMES -------
+        require(openxlsx)
+        wb <- createWorkbook()
+        
+        #temp_df <- reactive_df()
+        report_title <- paste("Test Version -- Summary Report for","unique(temp_df$Region)","Region(s)")
+        
+        addWorksheet(wb, "Portfolio Summary")
+        # mergeCells(wb,1,c(2,3,4),1)
+        
+        writeData(wb, 1,
+                  report_title,
+                  startRow = 1,
+                  startCol = 2)
+        
+        writeDataTable(wb, 1,  sum_display_df, startRow = 3, startCol = 2, withFilter = F)
+        writeDataTable(wb, 1,  display_df, startRow = 5+(nrow(sum_display_df)+2), startCol = 2,withFilter = F)
+        writeDataTable(wb, 1,  display_df_funding, startRow = 15 + nrow(display_df), startCol = 2,withFilter = F)
+        
+        
+        setColWidths(wb, 1, cols = 1:ncol(display_df)+1, widths = "auto")
+        # header_style <- createStyle(borderColour = getOption("openxlsx.borderColour", "black"),
+        #                             borderStyle = getOption("openxlsx.borderStyle", "thick"),
+        #                             halign = 'center',
+        #                             valign = 'center',
+        #                             textDecoration = NULL,
+        #                             wrapText = TRUE)
+        # 
+        # addStyle(wb,1,rows=3,cols=2:length(sum_display_df)+1,style = header_style)
+        # 
+        ## opens a temp version
+        openXL(wb)
+      })
 
       output$focal_grants_active_3_zero_dis <- renderValueBox({
         
         temp_df <- reactive_df()
-        
         temp_df %>% filter(tf_age_months >= 3,
                            percent_unaccounted==100) %>%
           nrow() %>%
@@ -1201,7 +1726,6 @@ server <- shinyServer(function(input,output,session) {
                    subtitle = HTML("<b>Grants aged >= 3 months with no disbursements/committments</b> <button id=\"show_region_grants_no_discom\" type=\"button\" class=\"btn btn-default action-button\">Show Grants</button>"))
 
       })
-
       output$focal_grants_closing_3 <- renderValueBox({
         
         temp_df <- reactive_df()
@@ -1211,7 +1735,6 @@ server <- shinyServer(function(input,output,session) {
                    subtitle = HTML("<b>Grants closing in less than 3 months</b> <button id=\"show_region_grants_closing_3\" type=\"button\" class=\"btn btn-default action-button\">Show Grants</button>"))
 
       })
-
       output$region_grants_may_need_transfer <- renderValueBox({
         
         temp_df <- reactive_df()
@@ -1222,8 +1745,6 @@ server <- shinyServer(function(input,output,session) {
                    color = 'orange')
 
       })
-      
-      
       output$region_grants_active_no_transfer <- renderValueBox({
         
         temp_df <- reactive_df()
@@ -1234,7 +1755,6 @@ server <- shinyServer(function(input,output,session) {
                    color = 'orange')
         
       })
-
       output$disbursement_risk_GG <- renderPlot({
        # data$focal_grants <- reactive_df()
 
@@ -1377,7 +1897,6 @@ server <- shinyServer(function(input,output,session) {
       openXL(wb)
     })
 
-    
     observeEvent(input$show_grants_need_transfer, {
       temp_df <- reactive_df()
       
@@ -1442,8 +1961,6 @@ server <- shinyServer(function(input,output,session) {
       
     })
     
-  
-
     observeEvent(input$show_grants_VHR, {
       data <- reactive_df()
       isolate(data <- data %>% filter(`Grant Amount USD` != 0) %>%
@@ -1553,9 +2070,6 @@ server <- shinyServer(function(input,output,session) {
 
     })
     
-    
-    
-    
     observeEvent(input$show_region_grants_closing_3, {
       data <- reactive_df()
       isolate(data <- data %>% filter(`Grant Amount USD` != 0,
@@ -1582,7 +2096,6 @@ server <- shinyServer(function(input,output,session) {
                             easyClose = TRUE))
       
     })
-    
     
     observeEvent(input$show_region_grants_no_discom, {
       data <- reactive_df()
@@ -1613,9 +2126,7 @@ server <- shinyServer(function(input,output,session) {
       
     })
     
-    
-    
-    
+   
     output$RETF_n_grants_R <- renderValueBox({
       
       temp_df <- reactive_df_2()
@@ -1661,7 +2172,6 @@ server <- shinyServer(function(input,output,session) {
       
     })
     
-    
     output$RETF_trustees_R_pie <- renderPlotly({
       
       temp_df <- reactive_df_2() 
@@ -1693,12 +2203,8 @@ server <- shinyServer(function(input,output,session) {
       
     })
     
-    
-    
-
-    
+ 
 #final closing brackets    
-    
     
     
 # TAB.4 PMA -------------------------------------

@@ -13,7 +13,7 @@ AFR$GPURL_binary <- ifelse(AFR$`Lead GP/Global Themes`=="Urban, Resilience and L
 
 temp_df <- AFR
 
-temp_df_all <- temp_df %>%
+temp_df_all <- temp_df %>% 
   group_by(Country) %>%
   summarise("# Grants" = n(),
             "$ Amount" = dollar(sum(`Grant Amount USD`),accuracy = 1),

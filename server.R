@@ -73,8 +73,41 @@ server <- shinyServer(function(input,output,session) {
           "Trustees closing in < 12 months",
           .,
           icon = icon("stopwatch"),
-          color = "orange")
+          color = "orange",
+          subtitle = HTML("<button id=\"show_trustees_6months\" type=\"button\" class=\"btn btn-default action-button\">Show Trustees</button>"))
     })
+    
+    
+    observeEvent(input$show_trustees_6months, {
+      data <-  active_trustee %>%
+        filter(months_to_end_disbursement<=12) %>%
+        select(Fund,
+               `Fund Name`,
+               temp.name,
+               `Fund TTL Name`,
+               `Net Signed Condribution in USD`,
+               `Net Unpaid contribution in USD`,
+               `Available Balance USD`,
+               months_to_end_disbursement
+        ) %>%
+        arrange(months_to_end_disbursement) %>%
+        rename("Months Left to Disburse" = months_to_end_disbursement,
+               "Short Name"= temp.name) %>% 
+        mutate(`Net Signed Condribution in USD`=dollar(`Net Signed Condribution in USD`),
+               `Net Unpaid contribution in USD`=dollar(`Net Unpaid contribution in USD`),
+               `Available Balance USD`=dollar(`Available Balance USD`),
+               `Months Left to Disburse`=round(`Months Left to Disburse`,digits = 0))
+      
+      showModal(modalDialog(size = 'l',
+                            title = "Trustees Closing in less than 12 months",
+                            renderTable(data),
+                            easyClose = T))
+      
+    })
+    
+    
+    
+    
     
     output$`closing<6` <- renderInfoBox({
       active_trustee %>%
@@ -2319,8 +2352,11 @@ server <- shinyServer(function(input,output,session) {
           
         })
         
+        
+
+        
     
-    
+        
         
         
 # TAB.5 GRANT DASHBOARD

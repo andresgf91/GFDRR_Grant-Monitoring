@@ -31,7 +31,7 @@ server <- shinyServer(function(input,output,session) {
     
     output$total_contributions <- renderInfoBox({
       sum(active_trustee$`Net Signed Condribution in USD`) %>%
-      dollar() %>% 
+      dollar(accuracy = 1) %>% 
       infoBox(
         "Total Pledged", ., icon = icon("money-check-alt"),
         color = "blue", subtitle = "*all active trustees")
@@ -39,7 +39,7 @@ server <- shinyServer(function(input,output,session) {
     
     output$total_received <- renderInfoBox({
       sum(active_trustee$`Net Paid-In Condribution in USD`) %>% 
-      dollar() %>% 
+      dollar(accuracy = 1) %>% 
       infoBox(
         "Total Received", ., icon = icon("hand-holding-usd"),
         color = "blue", subtitle = "*all active trustees")
@@ -48,7 +48,7 @@ server <- shinyServer(function(input,output,session) {
     
     output$total_unpaid <- renderInfoBox({
       sum(active_trustee$`Net Unpaid contribution in USD`) %>% 
-      dollar()%>% 
+      dollar(accuracy = 1)%>% 
         infoBox(
           "Total Pending (Un-paid)", ., icon = icon("file-invoice-dollar"),
           color = "blue", subtitle = "*all active trustees")
@@ -60,7 +60,7 @@ server <- shinyServer(function(input,output,session) {
      temp_grants <- grants %>% filter(Trustee %in% active_trustee$Fund,
                                       `Fund Status`=="ACTV")
       sum(temp_grants$unnacounted_amount) %>% 
-      dollar()%>% 
+      dollar(accuracy = 1)%>% 
         infoBox(
           "Remaining Balance", ., icon = icon("receipt"),
           color = "blue", subtitle = "*all active grants")
@@ -94,9 +94,9 @@ server <- shinyServer(function(input,output,session) {
         arrange(months_to_end_disbursement) %>%
         rename("Months Left to Disburse" = months_to_end_disbursement,
                "Short Name"= temp.name) %>% 
-        mutate(`Net Signed Condribution in USD`=dollar(`Net Signed Condribution in USD`),
-               `Net Unpaid contribution in USD`=dollar(`Net Unpaid contribution in USD`),
-               `Available Balance USD`=dollar(`Available Balance USD`),
+        mutate(`Net Signed Condribution in USD`=dollar(`Net Signed Condribution in USD`,accuracy = 1),
+               `Net Unpaid contribution in USD`=dollar(`Net Unpaid contribution in USD`,accuracy = 1),
+               `Available Balance USD`=dollar(`Available Balance USD`,accuracy = 1),
                `Months Left to Disburse`=round(`Months Left to Disburse`,digits = 0))
       
       showModal(modalDialog(size = 'l',
@@ -407,7 +407,7 @@ server <- shinyServer(function(input,output,session) {
       plot_ly(data,
               labels = ~Region,
               values = ~total_award_amount,
-              text = ~percent(total_award_amount/total),
+              text = ~paste(round(total_award_amount/total*100,digits=1),"%"),
               hoverinfo = 'label+value+text',
               textinfo = 'text',
               type = 'pie') %>%
@@ -434,7 +434,7 @@ server <- shinyServer(function(input,output,session) {
       plot_ly(data,
               labels = ~pie_name,
               values = ~total_award_amount,
-              text = ~percent(total_award_amount/total),
+              text = ~paste(round(total_award_amount/total*100,digits=1),"%"),
               hoverinfo = 'label+value+text',
               textinfo = 'text',
               type = 'pie') %>%
@@ -1102,7 +1102,7 @@ server <- shinyServer(function(input,output,session) {
          plot_ly(data,
                  labels = ~pie_name,
                  values = ~total_award_amount,
-                 text = ~percent(total_award_amount/total),
+                 text = ~percent(total_award_amount/total,accuracy = .1),
                  hoverinfo = 'label+value+text',
                  textinfo = 'text',
                  type = 'pie') %>%
@@ -2394,7 +2394,7 @@ server <- shinyServer(function(input,output,session) {
         
         
         
-# TAB.5 GRANT DASHBOARD
+# TAB.5 GRANT DASHBOARD ---------
         
         reactive_grant <- reactive({
           grants %>%
@@ -2487,7 +2487,7 @@ server <- shinyServer(function(input,output,session) {
         
         output$single_grant_amount <- renderValueBox({
           grant <- reactive_grant()
-          grant$`Grant Amount USD` %>% dollar() %>% 
+          grant$`Grant Amount USD` %>%  dollar(accuracy = 1) %>% 
             valueBox(value=.,subtitle = "Grant Amount",color = "green")
           
           
@@ -2495,7 +2495,7 @@ server <- shinyServer(function(input,output,session) {
         
         output$single_grant_remaining_bal <- renderValueBox({
           grant <- reactive_grant()
-          grant$unnacounted_amount %>% dollar() %>% 
+          grant$unnacounted_amount %>% dollar(accuracy = 1) %>% 
             valueBox(value=.,subtitle = "Remaining Balance",color = "green")
           
         })
@@ -2568,7 +2568,7 @@ server <- shinyServer(function(input,output,session) {
             arrange(-total_dis) %>%
             mutate(
               "percent_of_total" = percent(total_dis /grant_amount),
-              'total_dis' = dollar(total_dis))  %>%
+              'total_dis' = dollar(total_dis,accuracy = 1))  %>%
             rename(
               "Expense Category" = item_group,
               "Disbursed to date" = total_dis,
@@ -2623,7 +2623,7 @@ server <- shinyServer(function(input,output,session) {
 
           isolate(if(!is.null(input$TTL_upi)){
             sum(TTL$`Grant Amount USD`) %>%
-              dollar %>%
+              dollar(accuracy = 1) %>%
               valueBox(value=.,subtitle = "Total Grant Amount",color = 'green')
 
           } else {
@@ -2649,7 +2649,7 @@ server <- shinyServer(function(input,output,session) {
           TTL <- reactive_TTL()
           TTL <- dplyr::distinct(TTL)
           isolate(if(!is.null(input$TTL_upi)){
-            valueBox(value=dollar(sum(TTL$unnacounted_amount)),subtitle = "Total Remaining Balance")
+            valueBox(value=dollar(sum(TTL$unnacounted_amount),accuracy = 1),subtitle = "Total Remaining Balance")
             
           } else {
             NULL

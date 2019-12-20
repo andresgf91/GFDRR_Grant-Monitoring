@@ -403,7 +403,7 @@ tab.6 <- tabItem(
              box(title = 'TTL Unit',
                  textOutput('TTL_unit_dash'),
                  width = NULL)),
-      column(width=2, valueBoxOutput("TTL_grants_active",width = NULL),
+      column(width=3, valueBoxOutput("TTL_grants_active",width = NULL),
              valueBoxOutput("TTL_total_grant_amount",width = NULL),
              valueBoxOutput("TTL_total_remaining_bal",width = NULL)),
       box(

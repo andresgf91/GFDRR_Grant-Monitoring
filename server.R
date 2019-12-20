@@ -17,6 +17,7 @@ library(ggplot2)
 library(lubridate)
 library(stringi)
 library(RColorBrewer)
+library(openxlsx)
 
 # Define server logic required to draw a histogram
 server <- shinyServer(function(input,output,session) {
@@ -1337,7 +1338,7 @@ server <- shinyServer(function(input,output,session) {
           paste("data-", Sys.Date(), ".xlsx", sep="")
         },
         content = function(file) {
-          saveWorkbook({
+          openxlsx::saveWorkbook({
             temp_df <- reactive_summary()
             
             sum_df_all <- temp_df %>%
@@ -1485,7 +1486,7 @@ server <- shinyServer(function(input,output,session) {
           paste("data-", Sys.Date(), ".xlsx", sep="")
         },
         content = function(file) {
-          saveWorkbook({
+          openxlsx::saveWorkbook({
             temp_df <- reactive_summary()
             
             sum_df_all <- temp_df %>%
@@ -1633,7 +1634,7 @@ server <- shinyServer(function(input,output,session) {
           paste("data-", Sys.Date(), ".xlsx", sep="")
         },
         content = function(file) {
-          saveWorkbook({
+            openxlsx::saveWorkbook({
             temp_df <- reactive_summary()
             
             sum_df_all <- temp_df %>%
@@ -1885,7 +1886,7 @@ server <- shinyServer(function(input,output,session) {
                      paste("Costume Risk Report",date_data_udpated, ".xlsx", sep="")
                    },
                    content = function(file) {
-                     saveWorkbook({
+                     openxlsx::saveWorkbook({
 
       require(openxlsx)
       data <- reactive_df()

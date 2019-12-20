@@ -62,7 +62,7 @@ server <- shinyServer(function(input,output,session) {
       sum(temp_grants$unnacounted_amount) %>% 
       dollar(accuracy = 1)%>% 
         infoBox(
-          "Remaining Balance", ., icon = icon("receipt"),
+          "Available Balance", ., icon = icon("receipt"),
           color = "blue", subtitle = "*all active grants")
       })
     
@@ -138,7 +138,7 @@ server <- shinyServer(function(input,output,session) {
       
       new_df <- data.frame(Disbursed=sum(temp_df$`Disbursements USD`),
                            Committed=sum(temp_df$`Commitments USD`),
-                           "Remaining"=sum(temp_df$unnacounted_amount)) %>% 
+                           "Available Balance"=sum(temp_df$unnacounted_amount)) %>% 
         reshape2::melt() %>%
         mutate(total=sum(temp_df$`Grant Amount USD`)) %>%
         mutate(percent=value/total)
@@ -167,7 +167,7 @@ server <- shinyServer(function(input,output,session) {
           axis.title.x = element_blank(),
           plot.margin = unit(c(0,0,0,0), "cm")) +
         coord_flip() +
-        scale_fill_discrete(breaks=c("Remaining","Committed","Disbursed")) +
+        scale_fill_discrete(breaks=c("Available Balance","Committed","Disbursed")) +
         scale_fill_brewer(palette = "Blues") +
         geom_text(size = 3, position = position_stack(vjust = 0.5),) 
       
@@ -212,7 +212,7 @@ server <- shinyServer(function(input,output,session) {
       sum(temp_grants$unnacounted_amount) %>% 
         dollar()%>% 
         infoBox(
-          "Remaining Balance", ., icon = icon("receipt"),
+          "Available Balance", ., icon = icon("receipt"),
           color = "green", subtitle = "*operational grants")
     })
     
@@ -226,7 +226,7 @@ server <- shinyServer(function(input,output,session) {
       
       new_df <- data.frame(Disbursed=sum(temp_df$`Disbursements USD`),
                            Committed=sum(temp_df$`Commitments USD`),
-                           "Remaining"=sum(temp_df$unnacounted_amount)) %>% 
+                           "Available Balance"=sum(temp_df$unnacounted_amount)) %>% 
         reshape2::melt() %>%
         mutate(total=sum(temp_df$`Grant Amount USD`)) %>%
         mutate(percent=value/total)
@@ -255,7 +255,7 @@ server <- shinyServer(function(input,output,session) {
           axis.title.x = element_blank(),
           plot.margin = unit(c(0,0,0,0), "cm")) +
         coord_flip() +
-        scale_fill_discrete(breaks=c("Remaining","Committed","Disbursed")) +
+        scale_fill_discrete(breaks=c("Available Balance","Committed","Disbursed")) +
         scale_fill_brewer(palette = "Blues") +
         geom_text(size = 3, position = position_stack(vjust = 0.5),) 
       
@@ -286,7 +286,7 @@ server <- shinyServer(function(input,output,session) {
       sum(temp_grants$unnacounted_amount) %>% 
         dollar()%>% 
         infoBox(
-          "Remaining Balance", ., icon = icon("receipt"),
+          "Available Balance", ., icon = icon("receipt"),
           color = "yellow", subtitle = "*PMA grants")
     })
     
@@ -296,7 +296,7 @@ server <- shinyServer(function(input,output,session) {
       
       new_df <- data.frame(Disbursed=sum(temp_df$`Disbursements USD`),
                            Committed=sum(temp_df$`Commitments USD`),
-                           "Remaining"=sum(temp_df$unnacounted_amount)) %>% 
+                           "Available Balance"=sum(temp_df$unnacounted_amount)) %>% 
         reshape2::melt() %>%
         mutate(total=sum(temp_df$`Grant Amount USD`)) %>%
         mutate(percent=value/total)
@@ -325,7 +325,7 @@ server <- shinyServer(function(input,output,session) {
           axis.title.x = element_blank(),
           plot.margin = unit(c(0,0,0,0), "cm")) +
         coord_flip() +
-        scale_fill_discrete(breaks=c("Remaining","Committed","Disbursed")) +
+        scale_fill_discrete(breaks=c("Available Balance","Committed","Disbursed")) +
         scale_fill_brewer(palette = "Blues") +
         geom_text(size = 3, position = position_stack(vjust = 0.5),) 
       
@@ -341,31 +341,31 @@ server <- shinyServer(function(input,output,session) {
     
     
     
-    output$region_GP_GG <- renderPlotly({
-      
-      remove_num <- function(x){
-        word <- x
-        letter <- stri_sub(x,5)
-        if(letter %in% c("1","2","3","4","5","6","7","8","9")){
-          return(stri_sub(x,1,4))} else{
-            return(stri_sub(word))
-          }
-      }
-      
-      temp_df <- grants %>% filter(`Fund Status`=="ACTV")
-      
-      temp_df$aggregate_unit <- sapply(temp_df$`TTL Unit Name`, function(x) remove_num(x)) %>% as.vector()
-      data <- temp_df %>% 
-        group_by(`aggregate_unit`) %>% 
-        summarise(n_grants = n(), total_award_amount = sum(`Grant Amount USD`))
-      
-      plot_ly(data, labels = ~aggregate_unit, values = ~total_award_amount, type = 'pie') %>%
-        layout(xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
-               yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE))
-      
-       
-    })
-    
+    # output$region_GP_GG <- renderPlotly({
+    #   
+    #   remove_num <- function(x){
+    #     word <- x
+    #     letter <- stri_sub(x,5)
+    #     if(letter %in% c("1","2","3","4","5","6","7","8","9")){
+    #       return(stri_sub(x,1,4))} else{
+    #         return(stri_sub(word))
+    #       }
+    #   }
+    #   
+    #   temp_df <- grants %>% filter(`Fund Status`=="ACTV")
+    #   
+    #   temp_df$aggregate_unit <- sapply(temp_df$`TTL Unit Name`, function(x) remove_num(x)) %>% as.vector()
+    #   data <- temp_df %>% 
+    #     group_by(`aggregate_unit`) %>% 
+    #     summarise(n_grants = n(), total_award_amount = sum(`Grant Amount USD`))
+    #   
+    #   plot_ly(data, labels = ~aggregate_unit, values = ~total_award_amount, type = 'pie') %>%
+    #     layout(xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+    #            yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE))
+    #   
+    #    
+    # })
+    # 
     
     output$n_grants_region <- renderPlotly({
       
@@ -389,7 +389,7 @@ server <- shinyServer(function(input,output,session) {
               plot.background = element_rect(fill="transparent",color=NA),
               panel.background = element_rect(fill="transparent")) 
       
-      plotly::ggplotly(gg, tooltip = "text")
+      plotly::ggplotly(gg, tooltip = "text") 
       
     })
   
@@ -404,15 +404,25 @@ server <- shinyServer(function(input,output,session) {
       
       total <- sum(data$total_award_amount)
       
+      m <- list(
+        l = 40,
+        r = 20,
+        b = 70,
+        t = 50,
+        pad = 4
+      )
+      
       plot_ly(data,
               labels = ~Region,
               values = ~total_award_amount,
-              text = ~paste(round(total_award_amount/total*100,digits=1),"%"),
+              text = ~paste0(round(total_award_amount/total*100,digits=1)," %",
+                            "\n","(",n_grants," grants)"),
               hoverinfo = 'label+value+text',
               textinfo = 'text',
               type = 'pie') %>%
         layout(xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
-               yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE))
+               yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+               title="Funding by Region", margin=m)
     })
     
     
@@ -430,16 +440,26 @@ server <- shinyServer(function(input,output,session) {
       data <- data %>% group_by(pie_name) %>%
         summarise(n_grants=sum(n_grants),
                   total_award_amount=sum(total_award_amount))
+      m <- list(
+        l = 40,
+        r = 20,
+        b = 70,
+        t = 50,
+        pad = 4
+      )
+      
       
       plot_ly(data,
               labels = ~pie_name,
               values = ~total_award_amount,
-              text = ~paste(round(total_award_amount/total*100,digits=1),"%"),
+              text = ~paste0(round(total_award_amount/total*100,digits=1)," %",
+                             "\n","(",n_grants," grants)"),
               hoverinfo = 'label+value+text',
               textinfo = 'text',
               type = 'pie') %>%
         layout(xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
-               yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE))
+               yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+               title="Funding by Global Theme", margin=m)
       
       
     })
@@ -556,9 +576,22 @@ server <- shinyServer(function(input,output,session) {
         group_by(temp.name) %>% 
         summarise(n_grants = n(), total_award_amount = sum(`Grant Amount USD`))
       
-      plot_ly(data, labels = ~temp.name, values = ~total_award_amount, type = 'pie') %>%
+      total <- sum(data$total_award_amount)
+      m <- list(
+        l = 40,
+        r = 20,
+        b = 70,
+        t = 50,
+        pad = 4
+      )
+      plot_ly(data, labels = ~temp.name, values = ~total_award_amount, type = 'pie',
+              text=~paste0(round(total_award_amount/total*100,digits=1)," %",
+                           "\n","(",n_grants," grants)"),
+              hoverinfo="label+value+text",
+              textinfo='text') %>% 
         layout(xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
-               yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE))
+               yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),margin=m,
+               title = "RETF Funding per Trustee")
       
       
     })
@@ -567,13 +600,28 @@ server <- shinyServer(function(input,output,session) {
       
       temp_df <- grants %>% filter(`DF Execution Type`=="RE")
       
+      m <- list(
+        l = 100,
+        r = 40,
+        b = 70,
+        t = 50,
+        pad = 4
+      )
+      
       data <- temp_df %>% 
         group_by(Region) %>% 
         summarise(n_grants = n(), total_award_amount = sum(`Grant Amount USD`))
       
-      plot_ly(data, labels = ~Region, values = ~total_award_amount, type = 'pie') %>%
+      total <- sum(data$total_award_amount)
+      
+      plot_ly(data, labels = ~Region, values = ~total_award_amount, type = 'pie',
+              text=~paste0(round(total_award_amount/total*100,digits=1)," %",
+                           "\n","(",n_grants," grants)"),
+              hoverinfo="label+value+text",
+              textinfo='text') %>%
         layout(xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
-               yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE))
+               yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+               title = "RETF Funding per Region",margin=m)
       
       
     })
@@ -667,7 +715,7 @@ server <- shinyServer(function(input,output,session) {
         
         new_df <- data.frame(Disbursed=sum(temp_df$`Disbursements USD`),
                              Committed=sum(temp_df$`Commitments USD`),
-                             "Remaining"=sum(temp_df$unnacounted_amount)) %>% 
+                             "Available Balance"=sum(temp_df$unnacounted_amount)) %>% 
           reshape2::melt() %>%
           mutate(total=sum(temp_df$`Grant Amount USD`)) %>%
           mutate(percent=value/total)
@@ -696,7 +744,7 @@ server <- shinyServer(function(input,output,session) {
             axis.title.x = element_blank(),
             plot.margin = unit(c(0,0,0,0), "cm")) +
           coord_flip() +
-          scale_fill_discrete(breaks=c("Remaining","Committed","Disbursed")) +
+          scale_fill_discrete(breaks=c("Available Balance","Committed","Disbursed")) +
           scale_fill_brewer(palette = "Blues") +
           geom_text(size = 3, position = position_stack(vjust = 0.5),) 
         
@@ -729,7 +777,7 @@ server <- shinyServer(function(input,output,session) {
                          unnacounted_amount,months_to_end_disbursement) %>% 
                   mutate(`Grant Amount USD`=dollar(`Grant Amount USD`),
                          unnacounted_amount=dollar(unnacounted_amount)) %>% 
-                  rename("Remaining Balance"=unnacounted_amount,
+                  rename("Available Balance"=unnacounted_amount,
                          "Child Fund"=Fund,
                          "TTL Name"=`Fund TTL Name`,
                          "Months to Closing Date"=months_to_end_disbursement)
@@ -771,7 +819,7 @@ server <- shinyServer(function(input,output,session) {
                   mutate(percent_unaccounted = percent((percent_unaccounted/100)),
                          `Grant Amount USD` = dollar(`Grant Amount USD`)) %>% 
                   rename("Months Left to Disburse" = months_to_end_disbursement,
-                         "Remaining Bal. Percentage of Total" = percent_unaccounted)
+                         "Avail bal. Percentage of Total" = percent_unaccounted)
         )
         
         showModal(modalDialog(size = 'l',
@@ -829,7 +877,7 @@ server <- shinyServer(function(input,output,session) {
                                 "\n",
                                 "Total Active Awards Amount:",
                                 dollar(total_award_amount),"\n",
-                                "Total Remaining Balance:",dollar(total_remaining_balance)))) +
+                                "Total Available Balance:",dollar(total_remaining_balance)))) +
           geom_col(fill='royalblue') +
           theme_classic() +
           labs(x="Region", y="Total USD amount in active grants")+
@@ -957,7 +1005,7 @@ server <- shinyServer(function(input,output,session) {
       if(attention_needed>0){
 
         message_list <- paste(attention_needed,
-                           "Grant(s) are closing in less than 6 months and still have more than 35% remaining balance")
+                           "Grant(s) are closing in less than 6 months and still have more than 35% available balance")
 
         output$notifications_Menu <- renderMenu({
           dropdownMenu(type ="messages",
@@ -1014,7 +1062,7 @@ server <- shinyServer(function(input,output,session) {
         
         new_df <- data.frame(Disbursed=sum(temp_df$`Disbursements USD`),
                              Committed=sum(temp_df$`Commitments USD`),
-                             "Remaining"=sum(temp_df$unnacounted_amount)) %>% 
+                             "Available Balance"=sum(temp_df$unnacounted_amount)) %>% 
           reshape2::melt() %>%
           mutate(total=sum(temp_df$`Grant Amount USD`)) %>%
           mutate(percent=value/total)
@@ -1043,7 +1091,7 @@ server <- shinyServer(function(input,output,session) {
             axis.title.x = element_blank(),
             plot.margin = unit(c(0,0,0,0), "cm")) +
           coord_flip() +
-          scale_fill_discrete(breaks=c("Remaining","Committed","Disbursed")) +
+          scale_fill_discrete(breaks=c("Available Balance","Committed","Disbursed")) +
           scale_fill_brewer(palette = "Blues") +
           geom_text(size = 3, position = position_stack(vjust = 0.5),) 
         
@@ -1099,15 +1147,26 @@ server <- shinyServer(function(input,output,session) {
            summarise(n_grants=sum(n_grants),
                      total_award_amount=sum(total_award_amount))
          
+         
+         m <- list(
+           l = 40,
+           r = 20,
+           b = 70,
+           t = 50,
+           pad = 4
+         )
+         
          plot_ly(data,
                  labels = ~pie_name,
                  values = ~total_award_amount,
-                 text = ~percent(total_award_amount/total,accuracy = .1),
+                 text = ~paste0(percent(total_award_amount/total,accuracy = .1),
+                                "\n","(",n_grants," grants)"),
                  hoverinfo = 'label+value+text',
                  textinfo = 'text',
                  type = 'pie') %>%
            layout(xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
-                  yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE))
+                  yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+                  margin=m)
         
       })
       
@@ -2257,16 +2316,27 @@ server <- shinyServer(function(input,output,session) {
       data <- data %>% group_by(pie_name) %>%
         summarise(n_grants=sum(n_grants),
                   total_award_amount=sum(total_award_amount))
+      m <- list(
+        l = 40,
+        r = 20,
+        b = 40,
+        t = 90,
+        pad = 4
+      )
+      
+      
       
       plot_ly(data,
               labels = ~pie_name,
               values = ~total_award_amount,
-              text = ~percent(total_award_amount/total),
+              text = ~paste0(percent(total_award_amount/total),"\n","(",n_grants," grants)"),
               hoverinfo = 'label+value+text',
               textinfo = 'text',
               type = 'pie') %>%
         layout(xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
-               yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE))
+               yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+               margin=m,
+               title="RETF Funding (Costum Selection)")
       
       
     })
@@ -2496,7 +2566,7 @@ server <- shinyServer(function(input,output,session) {
         output$single_grant_remaining_bal <- renderValueBox({
           grant <- reactive_grant()
           grant$unnacounted_amount %>% dollar(accuracy = 1) %>% 
-            valueBox(value=.,subtitle = "Remaining Balance",color = "green")
+            valueBox(value=.,subtitle = "Available Balance",color = "green")
           
         })
         
@@ -2649,7 +2719,7 @@ server <- shinyServer(function(input,output,session) {
           TTL <- reactive_TTL()
           TTL <- dplyr::distinct(TTL)
           isolate(if(!is.null(input$TTL_upi)){
-            valueBox(value=dollar(sum(TTL$unnacounted_amount),accuracy = 1),subtitle = "Total Remaining Balance")
+            valueBox(value=dollar(sum(TTL$unnacounted_amount),accuracy = 1),subtitle = "Total Available Balance")
             
           } else {
             NULL
@@ -2690,7 +2760,7 @@ server <- shinyServer(function(input,output,session) {
         # output$single_grant_remaining_bal <- renderValueBox({
         #   grant <- reactive_grant()
         #   grant$unnacounted_amount %>% dollar() %>% 
-        #     valueBox(value=.,subtitle = "Remaining Balance",color = "green")
+        #     valueBox(value=.,subtitle = "Available Balance",color = "green")
         #   
         # })
         # 

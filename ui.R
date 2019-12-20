@@ -91,13 +91,13 @@ tab.1 <-  tabItem(tabName = "overview",
          plotlyOutput("overview_progress_GG_pma",height = 90)))),
   fluidRow(tabsetPanel(
     tabPanel("Contributions by Trustee",
-             plotlyOutput("plot1", height = 450)),
+             plotlyOutput("plot1", height = 420)),
     tabPanel("Active Grants per Region",
-             plotlyOutput("n_grants_region",height=450)),
+             plotlyOutput("n_grants_region",height=400)),
     tabPanel("Active Funding per Region",
-             plotlyOutput("funding_region",height=450)),
+             plotlyOutput("funding_region",height=420)),
     tabPanel("Active Funding by Global Theme",
-             plotlyOutput("funding_GP",height=450)))))))
+             plotlyOutput("funding_GP",height=550)))))))
 
 # tab 1.3 ------
 tab.1.3 <-  tabItem(tabName = "admin_info",
@@ -120,9 +120,9 @@ tab.1.3 <-  tabItem(tabName = "admin_info",
                           ),
                           fluidPage(tabsetPanel(
                             tabPanel(title = "Trustees",
-                                     plotlyOutput("RETF_trustees_A_pie")),
+                                     plotlyOutput("RETF_trustees_A_pie", height = 450)),
                             tabPanel(title = "Regions",
-                                     plotlyOutput("RETF_region_A_pie"))
+                                     plotlyOutput("RETF_region_A_pie",height = 450))
                           ))
                         )
                       )
@@ -253,7 +253,7 @@ tab.3 <-  tabItem(tabName = "regions",
                               plotlyOutput(outputId = "focal_region_n_grants_GG", width = 1000)
                             ),
                             tabPanel(title = "Global Themes",
-                                     plotlyOutput(outputId = "region_GP_GG", width = 1200))
+                                     plotlyOutput(outputId = "region_GP_GG", width = 1200,height=500))
                           )
                         ),
                         tabPanel(
@@ -307,7 +307,7 @@ tab.3 <-  tabItem(tabName = "regions",
                             valueBoxOutput("RETF_n_grants_R"),
                             valueBoxOutput("RETF_$_grants_R")
                           ),
-                          fluidRow(plotlyOutput("RETF_trustees_R_pie"))
+                          fluidRow(plotlyOutput("RETF_trustees_R_pie",height=470))
                         )
                       )
                     )

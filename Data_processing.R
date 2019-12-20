@@ -46,6 +46,8 @@ expenses <- read.csv(file='V2_GFDRR TF Expense Details - FY18 and FY19 YTD(AutoR
 expenses <- expenses %>% mutate(Disbursements.FY.2018=as.numeric(Disbursements.FY.2018),
                             Disbursements.FY.2019...YTD.Feb.2019=as.numeric(Disbursements.FY.2019...YTD.Feb.2019))
 
+recode_GT$`Lead GP/Global Themes`[which(recode_GT$`Lead GP/Global Themes`=="Climate Change")] <- "Climate Change/GFDRR"
+SR_grant_details$`Lead GP/Global Themes`[which(SR_grant_details$`Lead GP/Global Themes`=="Climate Change")] <- "Climate Change/GFDRR"
 #create a new df with only active trustees and with recoded names
 
 trustee$still_days_to_disburse <- as.Date(trustee$`TF End Disb Date`) > today()
@@ -71,6 +73,10 @@ homeless_TFs <- grants %>% filter(is.na(`Lead GP/Global Themes`)) %>%
   select(Fund,`TTL Unit Name`)
 
 #assign global theme to grant based on Grant TTL unit
+
+
+
+
 homed_TFs <- left_join(homeless_TFs,recode_GT,by=c("TTL Unit Name"="Resp. Unit")) %>%
   select(Fund,`Lead GP/Global Themes`)
 

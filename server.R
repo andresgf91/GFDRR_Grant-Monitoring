@@ -1331,423 +1331,450 @@ server <- shinyServer(function(input,output,session) {
       })
       
       
-      observeEvent(input$generate_full_excel_report_1,{
-  # -------- SUMMARY DF -----------       
-        
-        temp_df <- reactive_summary()
-        
-        sum_df_all <- temp_df %>%
-          summarise("# Grants" = n(),
-                    "$ Amount" = sum(`Grant Amount USD`),
-                    "Balance" = sum(unnacounted_amount)) %>%
-          mutate("percent"= Balance/`$ Amount`)%>% 
-          mutate(`$ Amount`= dollar(`$ Amount`,accuracy = 1),
-                 `Balance`=dollar(`Balance`,accuracy = 1),
-                 `percent`=percent(`percent`))
-        
-        sum_df_GPURL <-  temp_df %>%
-          filter(GPURL_binary=="GPURL") %>% 
-          summarise("# Grants" = n(),
-                    "$ Amount" = sum(`Grant Amount USD`),
-                    "Balance" = sum(unnacounted_amount))%>%
-          mutate("percent"= Balance/`$ Amount`)%>% 
-          mutate(`$ Amount`= dollar(`$ Amount`,accuracy = 1),
-                 `Balance`=dollar(`Balance`,accuracy = 1),
-                 `percent`=percent(`percent`))
-        
-        sum_df_non_GPURL <- temp_df %>%
-          filter(GPURL_binary=="Non-GPURL") %>% 
-          summarise("# Grants" = n(),
-                    "$ Amount" = sum(`Grant Amount USD`),
-                    "Balance" = sum(unnacounted_amount))%>%
-          mutate("percent"= Balance/`$ Amount`) %>% 
-          mutate(`$ Amount`= dollar(`$ Amount`,accuracy = 1),
-                 `Balance`=dollar(`Balance`,accuracy = 1),
-                 `percent`=percent(`percent`))
-        
-        
-        cutoff_date <- as.character(input$summary_table_cutoff_date)
-        
-        sum_display_df <- data.frame("Summary"= c("Grant Count",
-                                                  "Total $ (Million)",
-                                                  paste0("Total Uncommitted Balance ($) to Implement by ",cutoff_date),
-                                                  paste0("% Uncommitted Balance ($) to Implement by ",cutoff_date)),
-                                     "GPURL"=unname(unlist(as.list(sum_df_GPURL))),
-                                     "Non-GPURL"=unname(unlist(as.list(sum_df_non_GPURL))),
-                                     "Combined Total"=unname(unlist(as.list(sum_df_all))))
-        
-        
-  #---------COUNTRIES DF ----------------------
-        temp_df <- reactive_df()
-        temp_df_all <- temp_df %>%
-          group_by(Country) %>%
-          summarise("# Grants" = n(),
-                    "$ Amount" = dollar(sum(`Grant Amount USD`)),
-                    "Balance" = dollar(sum(unnacounted_amount)))
-        
-        temp_df_GPURL <-  temp_df %>% filter(GPURL_binary=="GPURL") %>% 
-          group_by(Country) %>%
-          summarise("# Grants" = n(),
-                    "$ Amount" = dollar(sum(`Grant Amount USD`)),
-                    "Balance" = dollar(sum(unnacounted_amount)))
-        
-        temp_df_non_GPURL <- temp_df %>% filter(GPURL_binary=="Non-GPURL") %>% 
-          group_by(Country) %>%
-          summarise("# Grants" = n(),
-                    "$ Amount" = dollar(sum(`Grant Amount USD`)),
-                    "Balance" = dollar(sum(unnacounted_amount)))
-        
-        
-        display_df_partial <- full_join(temp_df_GPURL,
-                                        temp_df_non_GPURL,
-                                        by="Country",
-                                        suffix=c(" (GPURL)"," (Non-GPURL)"))
-        
-        
-        display_df <- left_join(temp_df_all,display_df_partial,by="Country")
-        
-        
-  #---------FUNDING SOURCE DF ----------------------
-        
-        temp_df <- reactive_country_regions()
-        temp_df_all <- temp_df %>%
-          group_by(temp.name) %>%
-          summarise("# Grants" = n(),
-                    "$ Amount" = dollar(sum(`Grant Amount USD`)),
-                    "Balance" = dollar(sum(unnacounted_amount)))
-        
-        temp_df_GPURL <-  temp_df %>% filter(GPURL_binary=="GPURL") %>% 
-          group_by(temp.name) %>%
-          summarise("# Grants" = n(),
-                    "$ Amount" = dollar(sum(`Grant Amount USD`)),
-                    "Balance" = dollar(sum(unnacounted_amount)))
-        
-        temp_df_non_GPURL <- temp_df %>% filter(GPURL_binary=="Non-GPURL") %>% 
-          group_by(temp.name) %>%
-          summarise("# Grants" = n(),
-                    "$ Amount" = dollar(sum(`Grant Amount USD`)),
-                    "Balance" = dollar(sum(unnacounted_amount)))
-        
-        
-        display_df_partial <- full_join(temp_df_GPURL,
-                                        temp_df_non_GPURL,
-                                        by="temp.name",
-                                        suffix=c(" (GPURL)"," (Non-GPURL)"))
-        
-        
-        display_df_funding <- left_join(temp_df_all,display_df_partial,by="temp.name")
-        
-  #------ CREATE EXCEL WORKBOOK AND ADD DATAFRAMES -------
-        require(openxlsx)
-        wb <- createWorkbook()
-        
-        #temp_df <- reactive_df()
-        report_title <- paste("Test Version -- Summary Report for","unique(temp_df$Region)","Region(s)")
-        
-        addWorksheet(wb, "Portfolio Summary")
-       # mergeCells(wb,1,c(2,3,4),1)
-        
-        writeData(wb, 1,
-                  report_title,
-                  startRow = 1,
-                  startCol = 2)
-        
-        writeDataTable(wb, 1,  sum_display_df, startRow = 3, startCol = 2, withFilter = F)
-        writeDataTable(wb, 1,  display_df, startRow = 5+(nrow(sum_display_df)+2), startCol = 2,withFilter = F)
-        writeDataTable(wb, 1,  display_df_funding, startRow = 15 + nrow(display_df), startCol = 2,withFilter = F)
-        
-        
-        setColWidths(wb, 1, cols = 1:ncol(display_df)+1, widths = "auto")
-        # header_style <- createStyle(borderColour = getOption("openxlsx.borderColour", "black"),
-        #                             borderStyle = getOption("openxlsx.borderStyle", "thick"),
-        #                             halign = 'center',
-        #                             valign = 'center',
-        #                             textDecoration = NULL,
-        #                             wrapText = TRUE)
-        # 
-        # addStyle(wb,1,rows=3,cols=2:length(sum_display_df)+1,style = header_style)
-        # 
-        ## opens a temp version
-        openXL(wb)
+      #-----------generate_full_excel_report_1----------      
+      output$generate_full_excel_report_1 <- downloadHandler(
+        filename = function() {
+          paste("data-", Sys.Date(), ".xlsx", sep="")
+        },
+        content = function(file) {
+          saveWorkbook({
+            temp_df <- reactive_summary()
+            
+            sum_df_all <- temp_df %>%
+              summarise("# Grants" = n(),
+                        "$ Amount" = sum(`Grant Amount USD`),
+                        "Balance" = sum(unnacounted_amount)) %>%
+              mutate("percent"= Balance/`$ Amount`)%>% 
+              mutate(`$ Amount`= dollar(`$ Amount`,accuracy = 1),
+                     `Balance`=dollar(`Balance`,accuracy = 1),
+                     `percent`=percent(`percent`))
+            
+            sum_df_GPURL <-  temp_df %>%
+              filter(GPURL_binary=="GPURL") %>% 
+              summarise("# Grants" = n(),
+                        "$ Amount" = sum(`Grant Amount USD`),
+                        "Balance" = sum(unnacounted_amount))%>%
+              mutate("percent"= Balance/`$ Amount`)%>% 
+              mutate(`$ Amount`= dollar(`$ Amount`,accuracy = 1),
+                     `Balance`=dollar(`Balance`,accuracy = 1),
+                     `percent`=percent(`percent`))
+            
+            sum_df_non_GPURL <- temp_df %>%
+              filter(GPURL_binary=="Non-GPURL") %>% 
+              summarise("# Grants" = n(),
+                        "$ Amount" = sum(`Grant Amount USD`),
+                        "Balance" = sum(unnacounted_amount))%>%
+              mutate("percent"= Balance/`$ Amount`) %>% 
+              mutate(`$ Amount`= dollar(`$ Amount`,accuracy = 1),
+                     `Balance`=dollar(`Balance`,accuracy = 1),
+                     `percent`=percent(`percent`))
+            
+            
+            cutoff_date <- as.character(input$summary_table_cutoff_date)
+            
+            sum_display_df <- data.frame("Summary"= c("Grant Count",
+                                                      "Total $ (Million)",
+                                                      paste0("Total Uncommitted Balance ($) to Implement by ",cutoff_date),
+                                                      paste0("% Uncommitted Balance ($) to Implement by ",cutoff_date)),
+                                         "GPURL"=unname(unlist(as.list(sum_df_GPURL))),
+                                         "Non-GPURL"=unname(unlist(as.list(sum_df_non_GPURL))),
+                                         "Combined Total"=unname(unlist(as.list(sum_df_all))))
+            
+            
+            #---------COUNTRIES DF ----------------------
+            temp_df <- reactive_df()
+            temp_df_all <- temp_df %>%
+              group_by(Country) %>%
+              summarise("# Grants" = n(),
+                        "$ Amount" = dollar(sum(`Grant Amount USD`)),
+                        "Balance" = dollar(sum(unnacounted_amount)))
+            
+            temp_df_GPURL <-  temp_df %>% filter(GPURL_binary=="GPURL") %>% 
+              group_by(Country) %>%
+              summarise("# Grants" = n(),
+                        "$ Amount" = dollar(sum(`Grant Amount USD`)),
+                        "Balance" = dollar(sum(unnacounted_amount)))
+            
+            temp_df_non_GPURL <- temp_df %>% filter(GPURL_binary=="Non-GPURL") %>% 
+              group_by(Country) %>%
+              summarise("# Grants" = n(),
+                        "$ Amount" = dollar(sum(`Grant Amount USD`)),
+                        "Balance" = dollar(sum(unnacounted_amount)))
+            
+            
+            display_df_partial <- full_join(temp_df_GPURL,
+                                            temp_df_non_GPURL,
+                                            by="Country",
+                                            suffix=c(" (GPURL)"," (Non-GPURL)"))
+            
+            
+            display_df <- left_join(temp_df_all,display_df_partial,by="Country")
+            
+            
+            #---------FUNDING SOURCE DF ----------------------
+            
+            temp_df <- reactive_country_regions()
+            temp_df_all <- temp_df %>%
+              group_by(temp.name) %>%
+              summarise("# Grants" = n(),
+                        "$ Amount" = dollar(sum(`Grant Amount USD`)),
+                        "Balance" = dollar(sum(unnacounted_amount)))
+            
+            temp_df_GPURL <-  temp_df %>% filter(GPURL_binary=="GPURL") %>% 
+              group_by(temp.name) %>%
+              summarise("# Grants" = n(),
+                        "$ Amount" = dollar(sum(`Grant Amount USD`)),
+                        "Balance" = dollar(sum(unnacounted_amount)))
+            
+            temp_df_non_GPURL <- temp_df %>% filter(GPURL_binary=="Non-GPURL") %>% 
+              group_by(temp.name) %>%
+              summarise("# Grants" = n(),
+                        "$ Amount" = dollar(sum(`Grant Amount USD`)),
+                        "Balance" = dollar(sum(unnacounted_amount)))
+            
+            
+            display_df_partial <- full_join(temp_df_GPURL,
+                                            temp_df_non_GPURL,
+                                            by="temp.name",
+                                            suffix=c(" (GPURL)"," (Non-GPURL)"))
+            
+            
+            display_df_funding <- left_join(temp_df_all,display_df_partial,by="temp.name")
+            
+            #------ CREATE EXCEL WORKBOOK AND ADD DATAFRAMES -------
+            require(openxlsx)
+            wb <- createWorkbook()
+            
+            #temp_df <- reactive_df()
+            report_title <- paste("Test Version -- Summary Report for","unique(temp_df$Region)","Region(s)")
+            
+            addWorksheet(wb, "Portfolio Summary")
+            # mergeCells(wb,1,c(2,3,4),1)
+            
+            writeData(wb, 1,
+                      report_title,
+                      startRow = 1,
+                      startCol = 2)
+            
+            writeDataTable(wb, 1,  sum_display_df, startRow = 3, startCol = 2, withFilter = F)
+            writeDataTable(wb, 1,  display_df, startRow = 5+(nrow(sum_display_df)+2), startCol = 2,withFilter = F)
+            writeDataTable(wb, 1,  display_df_funding, startRow = 15 + nrow(display_df), startCol = 2,withFilter = F)
+            
+            
+            setColWidths(wb, 1, cols = 1:ncol(display_df)+1, widths = "auto")
+            # header_style <- createStyle(borderColour = getOption("openxlsx.borderColour", "black"),
+            #                             borderStyle = getOption("openxlsx.borderStyle", "thick"),
+            #                             halign = 'center',
+            #                             valign = 'center',
+            #                             textDecoration = NULL,
+            #                             wrapText = TRUE)
+            # 
+            # addStyle(wb,1,rows=3,cols=2:length(sum_display_df)+1,style = header_style)
+            # 
+            ## opens a temp version
+            #openXL(wb)
+            wb
+            
+          },file,overwrite = TRUE)
         })
-      observeEvent(input$generate_full_excel_report_2,{
-        # -------- SUMMARY DF -----------       
-        
-        temp_df <- reactive_summary()
-        
-        sum_df_all <- temp_df %>%
-          summarise("# Grants" = n(),
-                    "$ Amount" = sum(`Grant Amount USD`),
-                    "Balance" = sum(unnacounted_amount)) %>%
-          mutate("percent"= Balance/`$ Amount`)%>% 
-          mutate(`$ Amount`= dollar(`$ Amount`,accuracy = 1),
-                 `Balance`=dollar(`Balance`,accuracy = 1),
-                 `percent`=percent(`percent`))
-        
-        sum_df_GPURL <-  temp_df %>%
-          filter(GPURL_binary=="GPURL") %>% 
-          summarise("# Grants" = n(),
-                    "$ Amount" = sum(`Grant Amount USD`),
-                    "Balance" = sum(unnacounted_amount))%>%
-          mutate("percent"= Balance/`$ Amount`)%>% 
-          mutate(`$ Amount`= dollar(`$ Amount`,accuracy = 1),
-                 `Balance`=dollar(`Balance`,accuracy = 1),
-                 `percent`=percent(`percent`))
-        
-        sum_df_non_GPURL <- temp_df %>%
-          filter(GPURL_binary=="Non-GPURL") %>% 
-          summarise("# Grants" = n(),
-                    "$ Amount" = sum(`Grant Amount USD`),
-                    "Balance" = sum(unnacounted_amount))%>%
-          mutate("percent"= Balance/`$ Amount`) %>% 
-          mutate(`$ Amount`= dollar(`$ Amount`,accuracy = 1),
-                 `Balance`=dollar(`Balance`,accuracy = 1),
-                 `percent`=percent(`percent`))
-        
-        
-        cutoff_date <- as.character(input$summary_table_cutoff_date)
-        
-        sum_display_df <- data.frame("Summary"= c("Grant Count",
-                                                  "Total $ (Million)",
-                                                  paste0("Total Uncommitted Balance ($) to Implement by ",cutoff_date),
-                                                  paste0("% Uncommitted Balance ($) to Implement by ",cutoff_date)),
-                                     "GPURL"=unname(unlist(as.list(sum_df_GPURL))),
-                                     "Non-GPURL"=unname(unlist(as.list(sum_df_non_GPURL))),
-                                     "Combined Total"=unname(unlist(as.list(sum_df_all))))
-        
-        
-        #---------COUNTRIES DF ----------------------
-        temp_df <- reactive_df()
-        temp_df_all <- temp_df %>%
-          group_by(Country) %>%
-          summarise("# Grants" = n(),
-                    "$ Amount" = dollar(sum(`Grant Amount USD`)),
-                    "Balance" = dollar(sum(unnacounted_amount)))
-        
-        temp_df_GPURL <-  temp_df %>% filter(GPURL_binary=="GPURL") %>% 
-          group_by(Country) %>%
-          summarise("# Grants" = n(),
-                    "$ Amount" = dollar(sum(`Grant Amount USD`)),
-                    "Balance" = dollar(sum(unnacounted_amount)))
-        
-        temp_df_non_GPURL <- temp_df %>% filter(GPURL_binary=="Non-GPURL") %>% 
-          group_by(Country) %>%
-          summarise("# Grants" = n(),
-                    "$ Amount" = dollar(sum(`Grant Amount USD`)),
-                    "Balance" = dollar(sum(unnacounted_amount)))
-        
-        
-        display_df_partial <- full_join(temp_df_GPURL,
-                                        temp_df_non_GPURL,
-                                        by="Country",
-                                        suffix=c(" (GPURL)"," (Non-GPURL)"))
-        
-        
-        display_df <- left_join(temp_df_all,display_df_partial,by="Country")
-        
-        
-        #---------FUNDING SOURCE DF ----------------------
-        
-        temp_df <- reactive_country_regions()
-        temp_df_all <- temp_df %>%
-          group_by(temp.name) %>%
-          summarise("# Grants" = n(),
-                    "$ Amount" = dollar(sum(`Grant Amount USD`)),
-                    "Balance" = dollar(sum(unnacounted_amount)))
-        
-        temp_df_GPURL <-  temp_df %>% filter(GPURL_binary=="GPURL") %>% 
-          group_by(temp.name) %>%
-          summarise("# Grants" = n(),
-                    "$ Amount" = dollar(sum(`Grant Amount USD`)),
-                    "Balance" = dollar(sum(unnacounted_amount)))
-        
-        temp_df_non_GPURL <- temp_df %>% filter(GPURL_binary=="Non-GPURL") %>% 
-          group_by(temp.name) %>%
-          summarise("# Grants" = n(),
-                    "$ Amount" = dollar(sum(`Grant Amount USD`)),
-                    "Balance" = dollar(sum(unnacounted_amount)))
-        
-        
-        display_df_partial <- full_join(temp_df_GPURL,
-                                        temp_df_non_GPURL,
-                                        by="temp.name",
-                                        suffix=c(" (GPURL)"," (Non-GPURL)"))
-        
-        
-        display_df_funding <- left_join(temp_df_all,display_df_partial,by="temp.name")
-        
-        #------ CREATE EXCEL WORKBOOK AND ADD DATAFRAMES -------
-        require(openxlsx)
-        wb <- createWorkbook()
-        
-        #temp_df <- reactive_df()
-        report_title <- paste("Test Version -- Summary Report for","unique(temp_df$Region)","Region(s)")
-        
-        addWorksheet(wb, "Portfolio Summary")
-        # mergeCells(wb,1,c(2,3,4),1)
-        
-        writeData(wb, 1,
-                  report_title,
-                  startRow = 1,
-                  startCol = 2)
-        
-        writeDataTable(wb, 1,  sum_display_df, startRow = 3, startCol = 2, withFilter = F)
-        writeDataTable(wb, 1,  display_df, startRow = 5+(nrow(sum_display_df)+2), startCol = 2,withFilter = F)
-        writeDataTable(wb, 1,  display_df_funding, startRow = 15 + nrow(display_df), startCol = 2,withFilter = F)
-        
-        
-        setColWidths(wb, 1, cols = 1:ncol(display_df)+1, widths = "auto")
-        # header_style <- createStyle(borderColour = getOption("openxlsx.borderColour", "black"),
-        #                             borderStyle = getOption("openxlsx.borderStyle", "thick"),
-        #                             halign = 'center',
-        #                             valign = 'center',
-        #                             textDecoration = NULL,
-        #                             wrapText = TRUE)
-        # 
-        # addStyle(wb,1,rows=3,cols=2:length(sum_display_df)+1,style = header_style)
-        # 
-        ## opens a temp version
-        openXL(wb)
-      })
-      observeEvent(input$generate_full_excel_report_3,{
-        # -------- SUMMARY DF -----------       
-        
-        temp_df <- reactive_summary()
-        
-        sum_df_all <- temp_df %>%
-          summarise("# Grants" = n(),
-                    "$ Amount" = sum(`Grant Amount USD`),
-                    "Balance" = sum(unnacounted_amount)) %>%
-          mutate("percent"= Balance/`$ Amount`)%>% 
-          mutate(`$ Amount`= dollar(`$ Amount`,accuracy = 1),
-                 `Balance`=dollar(`Balance`,accuracy = 1),
-                 `percent`=percent(`percent`))
-        
-        sum_df_GPURL <-  temp_df %>%
-          filter(GPURL_binary=="GPURL") %>% 
-          summarise("# Grants" = n(),
-                    "$ Amount" = sum(`Grant Amount USD`),
-                    "Balance" = sum(unnacounted_amount))%>%
-          mutate("percent"= Balance/`$ Amount`)%>% 
-          mutate(`$ Amount`= dollar(`$ Amount`,accuracy = 1),
-                 `Balance`=dollar(`Balance`,accuracy = 1),
-                 `percent`=percent(`percent`))
-        
-        sum_df_non_GPURL <- temp_df %>%
-          filter(GPURL_binary=="Non-GPURL") %>% 
-          summarise("# Grants" = n(),
-                    "$ Amount" = sum(`Grant Amount USD`),
-                    "Balance" = sum(unnacounted_amount))%>%
-          mutate("percent"= Balance/`$ Amount`) %>% 
-          mutate(`$ Amount`= dollar(`$ Amount`,accuracy = 1),
-                 `Balance`=dollar(`Balance`,accuracy = 1),
-                 `percent`=percent(`percent`))
-        
-        
-        cutoff_date <- as.character(input$summary_table_cutoff_date)
-        
-        sum_display_df <- data.frame("Summary"= c("Grant Count",
-                                                  "Total $ (Million)",
-                                                  paste0("Total Uncommitted Balance ($) to Implement by ",cutoff_date),
-                                                  paste0("% Uncommitted Balance ($) to Implement by ",cutoff_date)),
-                                     "GPURL"=unname(unlist(as.list(sum_df_GPURL))),
-                                     "Non-GPURL"=unname(unlist(as.list(sum_df_non_GPURL))),
-                                     "Combined Total"=unname(unlist(as.list(sum_df_all))))
-        
-        
-        #---------COUNTRIES DF ----------------------
-        temp_df <- reactive_df()
-        temp_df_all <- temp_df %>%
-          group_by(Country) %>%
-          summarise("# Grants" = n(),
-                    "$ Amount" = dollar(sum(`Grant Amount USD`)),
-                    "Balance" = dollar(sum(unnacounted_amount)))
-        
-        temp_df_GPURL <-  temp_df %>% filter(GPURL_binary=="GPURL") %>% 
-          group_by(Country) %>%
-          summarise("# Grants" = n(),
-                    "$ Amount" = dollar(sum(`Grant Amount USD`)),
-                    "Balance" = dollar(sum(unnacounted_amount)))
-        
-        temp_df_non_GPURL <- temp_df %>% filter(GPURL_binary=="Non-GPURL") %>% 
-          group_by(Country) %>%
-          summarise("# Grants" = n(),
-                    "$ Amount" = dollar(sum(`Grant Amount USD`)),
-                    "Balance" = dollar(sum(unnacounted_amount)))
-        
-        
-        display_df_partial <- full_join(temp_df_GPURL,
-                                        temp_df_non_GPURL,
-                                        by="Country",
-                                        suffix=c(" (GPURL)"," (Non-GPURL)"))
-        
-        
-        display_df <- left_join(temp_df_all,display_df_partial,by="Country")
-        
-        
-        #---------FUNDING SOURCE DF ----------------------
-        
-        temp_df <- reactive_country_regions()
-        temp_df_all <- temp_df %>%
-          group_by(temp.name) %>%
-          summarise("# Grants" = n(),
-                    "$ Amount" = dollar(sum(`Grant Amount USD`)),
-                    "Balance" = dollar(sum(unnacounted_amount)))
-        
-        temp_df_GPURL <-  temp_df %>% filter(GPURL_binary=="GPURL") %>% 
-          group_by(temp.name) %>%
-          summarise("# Grants" = n(),
-                    "$ Amount" = dollar(sum(`Grant Amount USD`)),
-                    "Balance" = dollar(sum(unnacounted_amount)))
-        
-        temp_df_non_GPURL <- temp_df %>% filter(GPURL_binary=="Non-GPURL") %>% 
-          group_by(temp.name) %>%
-          summarise("# Grants" = n(),
-                    "$ Amount" = dollar(sum(`Grant Amount USD`)),
-                    "Balance" = dollar(sum(unnacounted_amount)))
-        
-        
-        display_df_partial <- full_join(temp_df_GPURL,
-                                        temp_df_non_GPURL,
-                                        by="temp.name",
-                                        suffix=c(" (GPURL)"," (Non-GPURL)"))
-        
-        
-        display_df_funding <- left_join(temp_df_all,display_df_partial,by="temp.name")
-        
-        #------ CREATE EXCEL WORKBOOK AND ADD DATAFRAMES -------
-        require(openxlsx)
-        wb <- createWorkbook()
-        
-        #temp_df <- reactive_df()
-        report_title <- paste("Test Version -- Summary Report for","unique(temp_df$Region)","Region(s)")
-        
-        addWorksheet(wb, "Portfolio Summary")
-        # mergeCells(wb,1,c(2,3,4),1)
-        
-        writeData(wb, 1,
-                  report_title,
-                  startRow = 1,
-                  startCol = 2)
-        
-        writeDataTable(wb, 1,  sum_display_df, startRow = 3, startCol = 2, withFilter = F)
-        writeDataTable(wb, 1,  display_df, startRow = 5+(nrow(sum_display_df)+2), startCol = 2,withFilter = F)
-        writeDataTable(wb, 1,  display_df_funding, startRow = 15 + nrow(display_df), startCol = 2,withFilter = F)
-        
-        
-        setColWidths(wb, 1, cols = 1:ncol(display_df)+1, widths = "auto")
-        # header_style <- createStyle(borderColour = getOption("openxlsx.borderColour", "black"),
-        #                             borderStyle = getOption("openxlsx.borderStyle", "thick"),
-        #                             halign = 'center',
-        #                             valign = 'center',
-        #                             textDecoration = NULL,
-        #                             wrapText = TRUE)
-        # 
-        # addStyle(wb,1,rows=3,cols=2:length(sum_display_df)+1,style = header_style)
-        # 
-        ## opens a temp version
-        openXL(wb)
-      })
+      
+      
+      #-----------generate_full_excel_report_2----------      
+      output$generate_full_excel_report_2 <- downloadHandler(
+        filename = function() {
+          paste("data-", Sys.Date(), ".xlsx", sep="")
+        },
+        content = function(file) {
+          saveWorkbook({
+            temp_df <- reactive_summary()
+            
+            sum_df_all <- temp_df %>%
+              summarise("# Grants" = n(),
+                        "$ Amount" = sum(`Grant Amount USD`),
+                        "Balance" = sum(unnacounted_amount)) %>%
+              mutate("percent"= Balance/`$ Amount`)%>% 
+              mutate(`$ Amount`= dollar(`$ Amount`,accuracy = 1),
+                     `Balance`=dollar(`Balance`,accuracy = 1),
+                     `percent`=percent(`percent`))
+            
+            sum_df_GPURL <-  temp_df %>%
+              filter(GPURL_binary=="GPURL") %>% 
+              summarise("# Grants" = n(),
+                        "$ Amount" = sum(`Grant Amount USD`),
+                        "Balance" = sum(unnacounted_amount))%>%
+              mutate("percent"= Balance/`$ Amount`)%>% 
+              mutate(`$ Amount`= dollar(`$ Amount`,accuracy = 1),
+                     `Balance`=dollar(`Balance`,accuracy = 1),
+                     `percent`=percent(`percent`))
+            
+            sum_df_non_GPURL <- temp_df %>%
+              filter(GPURL_binary=="Non-GPURL") %>% 
+              summarise("# Grants" = n(),
+                        "$ Amount" = sum(`Grant Amount USD`),
+                        "Balance" = sum(unnacounted_amount))%>%
+              mutate("percent"= Balance/`$ Amount`) %>% 
+              mutate(`$ Amount`= dollar(`$ Amount`,accuracy = 1),
+                     `Balance`=dollar(`Balance`,accuracy = 1),
+                     `percent`=percent(`percent`))
+            
+            
+            cutoff_date <- as.character(input$summary_table_cutoff_date)
+            
+            sum_display_df <- data.frame("Summary"= c("Grant Count",
+                                                      "Total $ (Million)",
+                                                      paste0("Total Uncommitted Balance ($) to Implement by ",cutoff_date),
+                                                      paste0("% Uncommitted Balance ($) to Implement by ",cutoff_date)),
+                                         "GPURL"=unname(unlist(as.list(sum_df_GPURL))),
+                                         "Non-GPURL"=unname(unlist(as.list(sum_df_non_GPURL))),
+                                         "Combined Total"=unname(unlist(as.list(sum_df_all))))
+            
+            
+            #---------COUNTRIES DF ----------------------
+            temp_df <- reactive_df()
+            temp_df_all <- temp_df %>%
+              group_by(Country) %>%
+              summarise("# Grants" = n(),
+                        "$ Amount" = dollar(sum(`Grant Amount USD`)),
+                        "Balance" = dollar(sum(unnacounted_amount)))
+            
+            temp_df_GPURL <-  temp_df %>% filter(GPURL_binary=="GPURL") %>% 
+              group_by(Country) %>%
+              summarise("# Grants" = n(),
+                        "$ Amount" = dollar(sum(`Grant Amount USD`)),
+                        "Balance" = dollar(sum(unnacounted_amount)))
+            
+            temp_df_non_GPURL <- temp_df %>% filter(GPURL_binary=="Non-GPURL") %>% 
+              group_by(Country) %>%
+              summarise("# Grants" = n(),
+                        "$ Amount" = dollar(sum(`Grant Amount USD`)),
+                        "Balance" = dollar(sum(unnacounted_amount)))
+            
+            
+            display_df_partial <- full_join(temp_df_GPURL,
+                                            temp_df_non_GPURL,
+                                            by="Country",
+                                            suffix=c(" (GPURL)"," (Non-GPURL)"))
+            
+            
+            display_df <- left_join(temp_df_all,display_df_partial,by="Country")
+            
+            
+            #---------FUNDING SOURCE DF ----------------------
+            
+            temp_df <- reactive_country_regions()
+            temp_df_all <- temp_df %>%
+              group_by(temp.name) %>%
+              summarise("# Grants" = n(),
+                        "$ Amount" = dollar(sum(`Grant Amount USD`)),
+                        "Balance" = dollar(sum(unnacounted_amount)))
+            
+            temp_df_GPURL <-  temp_df %>% filter(GPURL_binary=="GPURL") %>% 
+              group_by(temp.name) %>%
+              summarise("# Grants" = n(),
+                        "$ Amount" = dollar(sum(`Grant Amount USD`)),
+                        "Balance" = dollar(sum(unnacounted_amount)))
+            
+            temp_df_non_GPURL <- temp_df %>% filter(GPURL_binary=="Non-GPURL") %>% 
+              group_by(temp.name) %>%
+              summarise("# Grants" = n(),
+                        "$ Amount" = dollar(sum(`Grant Amount USD`)),
+                        "Balance" = dollar(sum(unnacounted_amount)))
+            
+            
+            display_df_partial <- full_join(temp_df_GPURL,
+                                            temp_df_non_GPURL,
+                                            by="temp.name",
+                                            suffix=c(" (GPURL)"," (Non-GPURL)"))
+            
+            
+            display_df_funding <- left_join(temp_df_all,display_df_partial,by="temp.name")
+            
+            #------ CREATE EXCEL WORKBOOK AND ADD DATAFRAMES -------
+            require(openxlsx)
+            wb <- createWorkbook()
+            
+            #temp_df <- reactive_df()
+            report_title <- paste("Test Version -- Summary Report for","unique(temp_df$Region)","Region(s)")
+            
+            addWorksheet(wb, "Portfolio Summary")
+            # mergeCells(wb,1,c(2,3,4),1)
+            
+            writeData(wb, 1,
+                      report_title,
+                      startRow = 1,
+                      startCol = 2)
+            
+            writeDataTable(wb, 1,  sum_display_df, startRow = 3, startCol = 2, withFilter = F)
+            writeDataTable(wb, 1,  display_df, startRow = 5+(nrow(sum_display_df)+2), startCol = 2,withFilter = F)
+            writeDataTable(wb, 1,  display_df_funding, startRow = 15 + nrow(display_df), startCol = 2,withFilter = F)
+            
+            
+            setColWidths(wb, 1, cols = 1:ncol(display_df)+1, widths = "auto")
+            # header_style <- createStyle(borderColour = getOption("openxlsx.borderColour", "black"),
+            #                             borderStyle = getOption("openxlsx.borderStyle", "thick"),
+            #                             halign = 'center',
+            #                             valign = 'center',
+            #                             textDecoration = NULL,
+            #                             wrapText = TRUE)
+            # 
+            # addStyle(wb,1,rows=3,cols=2:length(sum_display_df)+1,style = header_style)
+            # 
+            ## opens a temp version
+            #openXL(wb)
+            wb
+            
+          },file,overwrite = TRUE)
+        })
+      
+      
+      #-----------generate_full_excel_report_3----------      
+      output$generate_full_excel_report_3 <- downloadHandler(
+        filename = function() {
+          paste("data-", Sys.Date(), ".xlsx", sep="")
+        },
+        content = function(file) {
+          saveWorkbook({
+            temp_df <- reactive_summary()
+            
+            sum_df_all <- temp_df %>%
+              summarise("# Grants" = n(),
+                        "$ Amount" = sum(`Grant Amount USD`),
+                        "Balance" = sum(unnacounted_amount)) %>%
+              mutate("percent"= Balance/`$ Amount`)%>% 
+              mutate(`$ Amount`= dollar(`$ Amount`,accuracy = 1),
+                     `Balance`=dollar(`Balance`,accuracy = 1),
+                     `percent`=percent(`percent`))
+            
+            sum_df_GPURL <-  temp_df %>%
+              filter(GPURL_binary=="GPURL") %>% 
+              summarise("# Grants" = n(),
+                        "$ Amount" = sum(`Grant Amount USD`),
+                        "Balance" = sum(unnacounted_amount))%>%
+              mutate("percent"= Balance/`$ Amount`)%>% 
+              mutate(`$ Amount`= dollar(`$ Amount`,accuracy = 1),
+                     `Balance`=dollar(`Balance`,accuracy = 1),
+                     `percent`=percent(`percent`))
+            
+            sum_df_non_GPURL <- temp_df %>%
+              filter(GPURL_binary=="Non-GPURL") %>% 
+              summarise("# Grants" = n(),
+                        "$ Amount" = sum(`Grant Amount USD`),
+                        "Balance" = sum(unnacounted_amount))%>%
+              mutate("percent"= Balance/`$ Amount`) %>% 
+              mutate(`$ Amount`= dollar(`$ Amount`,accuracy = 1),
+                     `Balance`=dollar(`Balance`,accuracy = 1),
+                     `percent`=percent(`percent`))
+            
+            
+            cutoff_date <- as.character(input$summary_table_cutoff_date)
+            
+            sum_display_df <- data.frame("Summary"= c("Grant Count",
+                                                      "Total $ (Million)",
+                                                      paste0("Total Uncommitted Balance ($) to Implement by ",cutoff_date),
+                                                      paste0("% Uncommitted Balance ($) to Implement by ",cutoff_date)),
+                                         "GPURL"=unname(unlist(as.list(sum_df_GPURL))),
+                                         "Non-GPURL"=unname(unlist(as.list(sum_df_non_GPURL))),
+                                         "Combined Total"=unname(unlist(as.list(sum_df_all))))
+            
+            
+            #---------COUNTRIES DF ----------------------
+            temp_df <- reactive_df()
+            temp_df_all <- temp_df %>%
+              group_by(Country) %>%
+              summarise("# Grants" = n(),
+                        "$ Amount" = dollar(sum(`Grant Amount USD`)),
+                        "Balance" = dollar(sum(unnacounted_amount)))
+            
+            temp_df_GPURL <-  temp_df %>% filter(GPURL_binary=="GPURL") %>% 
+              group_by(Country) %>%
+              summarise("# Grants" = n(),
+                        "$ Amount" = dollar(sum(`Grant Amount USD`)),
+                        "Balance" = dollar(sum(unnacounted_amount)))
+            
+            temp_df_non_GPURL <- temp_df %>% filter(GPURL_binary=="Non-GPURL") %>% 
+              group_by(Country) %>%
+              summarise("# Grants" = n(),
+                        "$ Amount" = dollar(sum(`Grant Amount USD`)),
+                        "Balance" = dollar(sum(unnacounted_amount)))
+            
+            
+            display_df_partial <- full_join(temp_df_GPURL,
+                                            temp_df_non_GPURL,
+                                            by="Country",
+                                            suffix=c(" (GPURL)"," (Non-GPURL)"))
+            
+            
+            display_df <- left_join(temp_df_all,display_df_partial,by="Country")
+            
+            
+            #---------FUNDING SOURCE DF ----------------------
+            
+            temp_df <- reactive_country_regions()
+            temp_df_all <- temp_df %>%
+              group_by(temp.name) %>%
+              summarise("# Grants" = n(),
+                        "$ Amount" = dollar(sum(`Grant Amount USD`)),
+                        "Balance" = dollar(sum(unnacounted_amount)))
+            
+            temp_df_GPURL <-  temp_df %>% filter(GPURL_binary=="GPURL") %>% 
+              group_by(temp.name) %>%
+              summarise("# Grants" = n(),
+                        "$ Amount" = dollar(sum(`Grant Amount USD`)),
+                        "Balance" = dollar(sum(unnacounted_amount)))
+            
+            temp_df_non_GPURL <- temp_df %>% filter(GPURL_binary=="Non-GPURL") %>% 
+              group_by(temp.name) %>%
+              summarise("# Grants" = n(),
+                        "$ Amount" = dollar(sum(`Grant Amount USD`)),
+                        "Balance" = dollar(sum(unnacounted_amount)))
+            
+            
+            display_df_partial <- full_join(temp_df_GPURL,
+                                            temp_df_non_GPURL,
+                                            by="temp.name",
+                                            suffix=c(" (GPURL)"," (Non-GPURL)"))
+            
+            
+            display_df_funding <- left_join(temp_df_all,display_df_partial,by="temp.name")
+            
+            #------ CREATE EXCEL WORKBOOK AND ADD DATAFRAMES -------
+            require(openxlsx)
+            wb <- createWorkbook()
+            
+            #temp_df <- reactive_df()
+            report_title <- paste("Test Version -- Summary Report for","unique(temp_df$Region)","Region(s)")
+            
+            addWorksheet(wb, "Portfolio Summary")
+            # mergeCells(wb,1,c(2,3,4),1)
+            
+            writeData(wb, 1,
+                      report_title,
+                      startRow = 1,
+                      startCol = 2)
+            
+            writeDataTable(wb, 1,  sum_display_df, startRow = 3, startCol = 2, withFilter = F)
+            writeDataTable(wb, 1,  display_df, startRow = 5+(nrow(sum_display_df)+2), startCol = 2,withFilter = F)
+            writeDataTable(wb, 1,  display_df_funding, startRow = 15 + nrow(display_df), startCol = 2,withFilter = F)
+            
+            
+            setColWidths(wb, 1, cols = 1:ncol(display_df)+1, widths = "auto")
+            # header_style <- createStyle(borderColour = getOption("openxlsx.borderColour", "black"),
+            #                             borderStyle = getOption("openxlsx.borderStyle", "thick"),
+            #                             halign = 'center',
+            #                             valign = 'center',
+            #                             textDecoration = NULL,
+            #                             wrapText = TRUE)
+            # 
+            # addStyle(wb,1,rows=3,cols=2:length(sum_display_df)+1,style = header_style)
+            # 
+            ## opens a temp version
+            #openXL(wb)
+            wb
+            
+          },file,overwrite = TRUE)
+        })
+      
+      
 
       output$focal_grants_active_3_zero_dis <- renderValueBox({
         
@@ -1853,7 +1880,12 @@ server <- shinyServer(function(input,output,session) {
 
      })
 
-    observeEvent(input$generate_risk_report,{
+    output$generate_risk_report <-  downloadHandler(
+                   filename = function() {
+                     paste("Costume Risk Report",date_data_udpated, ".xlsx", sep="")
+                   },
+                   content = function(file) {
+                     saveWorkbook({
 
       require(openxlsx)
       data <- reactive_df()
@@ -1879,7 +1911,7 @@ server <- shinyServer(function(input,output,session) {
                            required_disbursement_rate,
                            disbursement_risk_level)
 
-      report_title <- paste("Disbursement Risk Report for",region,"Region")
+      report_title <- paste("Disbursement Risk Report for",unlist(region),"Region")
 
       addWorksheet(wb, "Disbursement Risk Report")
       mergeCells(wb,1,c(2,3,4),1)
@@ -1927,8 +1959,10 @@ server <- shinyServer(function(input,output,session) {
       addStyle(wb,1,rows=3,cols=2:length(df)+1,style = header_style)
 
       ## opens a temp version
-      openXL(wb)
-    })
+      wb
+      },file,overwrite = TRUE)
+                     }
+    )
 
     observeEvent(input$show_grants_need_transfer, {
       temp_df <- reactive_df()
@@ -2336,7 +2370,7 @@ server <- shinyServer(function(input,output,session) {
                            Region,
                            percent_unaccounted,
                            tf_age_months,
-                           months_to_end_disbursement,
+                           months_to_end_disbursement
                            ) %>%
                     arrange(months_to_end_disbursement) %>%
                     mutate(percent_unaccounted = percent((percent_unaccounted/100)),

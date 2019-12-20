@@ -265,9 +265,8 @@ tab.3 <-  tabItem(tabName = "regions",
                             valueBoxOutput("high_risk", width = 3),
                             valueBoxOutput("very_high_risk", width = 3),
                             fluidRow(column(3,offset = 1,
-                                            actionButton("generate_risk_report",
-                                           "Download Excel Report",
-                                           icon=icon("download")))
+                                            downloadButton("generate_risk_report",
+                                           "Download Excel Report"))
                             )
                           )
                         ),
@@ -282,27 +281,24 @@ tab.3 <-  tabItem(tabName = "regions",
                           ),
                           DT::dataTableOutput(outputId = "region_summary_grants_table"),
                           fluidRow(column(3,offset = 1,
-                                          actionButton("generate_full_excel_report_1",
-                                                       "Open test version excel Report",
-                                                       icon=icon("download")))
+                                          downloadButton("generate_full_excel_report_1",
+                                                       "Open test version excel Report"))
                           )
                         ),
                         tabPanel(
                           title = "Countries",
                           DT::dataTableOutput(outputId = "region_countries_grants_table"),
                           fluidRow(column(3,offset = 1,
-                                          actionButton("generate_full_excel_report_2",
-                                                       "Open test version excel Report",
-                                                       icon=icon("download")))
+                                          downloadButton("generate_full_excel_report_2",
+                                                       "Open test version excel Report"))
                           )
                         ),
                         tabPanel(
                           title = "Funding Source",
                           DT::dataTableOutput(outputId = "region_funding_source_grants_table"),
                           fluidRow(column(3,offset = 1,
-                                          actionButton("generate_full_excel_report_3",
-                                                       "Open test version excel Report",
-                                                       icon=icon("download")))
+                                          downloadButton("generate_full_excel_report_3",
+                                                       "Open draft excel Report"))
                           )
                         ),
                         tabPanel(

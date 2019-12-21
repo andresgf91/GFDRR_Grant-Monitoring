@@ -95,7 +95,7 @@ tab.1 <-  tabItem(tabName = "overview",
     tabPanel("Active Grants per Region",
              plotlyOutput("n_grants_region",height=400)),
     tabPanel("Active Funding per Region",
-             plotlyOutput("funding_region",height=420)),
+             plotlyOutput("funding_region",height=480)),
     tabPanel("Active Funding by Global Theme",
              plotlyOutput("funding_GP",height=550)))))))
 
@@ -367,7 +367,7 @@ tab.5 <- tabItem(
       box(title = 'Unit',
           textOutput('grant_unit'),
           width = NULL)),
-      column(width=2,
+      column(width=3,
              valueBoxOutput("single_grant_amount",width = NULL),
              valueBoxOutput("single_grant_remaining_bal",width = NULL),
              valueBoxOutput("single_grant_m_active",width = NULL),

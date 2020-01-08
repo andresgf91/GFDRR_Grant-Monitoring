@@ -1954,7 +1954,9 @@ server <- shinyServer(function(input,output,session) {
         unique() %>%
         paste(sep="",collapse="; ")
       wb <- createWorkbook()
-      df <- data %>% filter(`Fund Status`=="ACTV",`Grant Amount USD`>0)
+      df <- data %>% filter(`Fund Status`=="ACTV",
+                            `Grant Amount USD`>0,
+                            PMA=="no")
       df <- df %>%  select(Trustee,
                            temp.name,
                            Fund,

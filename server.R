@@ -1942,14 +1942,17 @@ server <- shinyServer(function(input,output,session) {
 
     output$generate_risk_report <-  downloadHandler(
                    filename = function() {
-                     paste("Costume Risk Report",date_data_udpated, ".xlsx", sep="")
+                     paste("Disbursement Risk_",date_data_udpated, ".xlsx", sep="")
                    },
                    content = function(file) {
                      openxlsx::saveWorkbook({
 
       require(openxlsx)
       data <- reactive_df()
-      region <- input$focal_select_region
+      region <- paste(unlist(input$focal_select_region), sep="", collapse="; ")
+      funding_sources <- data$temp.name %>%
+        unique() %>%
+        paste(sep="",collapse="; ")
       wb <- createWorkbook()
       df <- data %>% filter(`Fund Status`=="ACTV",`Grant Amount USD`>0)
       df <- df %>%  select(Trustee,
@@ -1967,21 +1970,42 @@ server <- shinyServer(function(input,output,session) {
                            months_to_end_disbursement,
                            unnacounted_amount,
                            percent_unaccounted,
-                           burn_rate,
+                           monthly_disbursement_rate,
                            required_disbursement_rate,
-                           disbursement_risk_level)
+                           disbursement_risk_level) %>% 
+        mutate(monthly_disbursement_rate = percent(monthly_disbursement_rate),
+              `Grant Amount USD`=dollar(`Grant Amount USD`),
+              `Disbursements USD`=dollar(`Disbursements USD`),
+              `Commitments USD`=dollar(`Commitments USD`),
+              unnacounted_amount=dollar(unnacounted_amount),
+              required_disbursement_rate = percent(required_disbursement_rate),
+              percent_unaccounted=percent(percent_unaccounted/100)) %>% 
+        rename("Trustee Name"= temp.name,
+               "Uncommitted Balance" = unnacounted_amount,
+               "Percent Uncommitted" = percent_unaccounted,
+               "Avg. Monthly Disbursment Rate" = monthly_disbursement_rate,
+               "Requirre Monthly Disbursment Rate" = required_disbursement_rate,
+               "Disbursement Risk Level"=disbursement_risk_level,
+               "Months to Closing Date"= months_to_end_disbursement)
 
-      report_title <- paste("Disbursement Risk Report for",unlist(region),"Region")
+      report_title <- paste("Disbursement Risk for",region,"Region(s)")
+      funding_sources <- paste("Funding Sources:",funding_sources)
 
-      addWorksheet(wb, "Disbursement Risk Report")
-      mergeCells(wb,1,c(2,3,4),1)
+      addWorksheet(wb, "Disbursement Risk")
+      mergeCells(wb,1,2:8,1)
+      mergeCells(wb,1,2:8,2)
 
       writeData(wb, 1,
                 report_title,
                 startRow = 1,
                 startCol = 2)
+      
+      writeData(wb, 1,
+                funding_sources,
+                startRow = 2,
+                startCol = 2)
 
-      writeDataTable(wb, 1, df, startRow = 3, startCol = 2)
+      writeDataTable(wb, 1, df, startRow = 4, startCol = 2)
 
 
       low_risk <- createStyle(fgFill ="#2ECC71")
@@ -1989,34 +2013,39 @@ server <- shinyServer(function(input,output,session) {
       high_risk <- createStyle(fgFill ="#FF5733")
       very_high_risk <- createStyle(fgFill ="#C70039")
 
-      low_risk_rows <- which(df$disbursement_risk_level=="Low Risk")
-      medium_risk_rows <- which(df$disbursement_risk_level=="Medium Risk")
-      high_risk_rows <- which(df$disbursement_risk_level=="High Risk")
-      very_high_risk_rows <- which(df$disbursement_risk_level=="Very High Risk")
+      low_risk_rows <- which(df$`Disbursement Risk Level`=="Low Risk")
+      medium_risk_rows <- which(df$`Disbursement Risk Level`=="Medium Risk")
+      high_risk_rows <- which(df$`Disbursement Risk Level`=="High Risk")
+      very_high_risk_rows <- which(df$`Disbursement Risk Level`=="Very High Risk")
 
 
       for (i in low_risk_rows){
-        addStyle(wb,1,rows=i+3,cols=1:length(df)+1,style = low_risk)
+        addStyle(wb,1,rows=i+4,cols=1:length(df)+1,style = low_risk)
       }
 
       for (i in medium_risk_rows){
-        addStyle(wb,1,rows=i+3,cols=1:length(df)+1,style = medium_risk)
+        addStyle(wb,1,rows=i+4,cols=1:length(df)+1,style = medium_risk)
       }
 
       for (i in high_risk_rows){
-        addStyle(wb,1,rows=i+3,cols=1:length(df)+1,style = high_risk)
+        addStyle(wb,1,rows=i+4,cols=1:length(df)+1,style = high_risk)
       }
 
       for (i in very_high_risk_rows){
-        addStyle(wb,1,rows=i+3,cols=1:length(df)+1,style = very_high_risk)
+        addStyle(wb,1,rows=i+4,cols=1:length(df)+1,style = very_high_risk)
       }
 
       header_style <- createStyle(borderColour = getOption("openxlsx.borderColour", "black"),
                                   borderStyle = getOption("openxlsx.borderStyle", "thick"),
-                                  halign = 'center', valign = 'center', textDecoration = NULL,
+                                  halign = 'center',
+                                  valign = 'center',
+                                  textDecoration = NULL,
                                   wrapText = TRUE)
 
-      addStyle(wb,1,rows=3,cols=2:length(df)+1,style = header_style)
+      addStyle(wb,1,rows=4,cols=2:length(df)+1,style = header_style)
+      
+      setColWidths(wb, 1, cols=2:length(df)+1, widths = "auto")
+      setColWidths(wb, 1, cols=5, widths = 100)
 
       ## opens a temp version
       wb

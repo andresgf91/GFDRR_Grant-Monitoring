@@ -128,8 +128,7 @@ tab.1.3 <-  tabItem(tabName = "admin_info",
                       )
                     ))
 
-
-## tab.2 (Trustee View) ----------------------
+## tab.2 (Parent Trustfund View) ----------------------
 tab.2 <- tabItem(tabName= "parent_tf",
                  fluidPage(titlePanel("Parent Trust Fund View"),
                            fluidRow(
@@ -155,19 +154,22 @@ tab.2 <- tabItem(tabName= "parent_tf",
                                       selectize = TRUE,
                                       selected =  sort(unique(grants$temp.name)))))),
                  fluidRow(
-                   column(width=4,
-                          infoBoxOutput("fund_contributions",width = NULL),
-                          infoBoxOutput("trustee_received",width = NULL),
-                          infoBoxOutput("trustee_unpaid",width = NULL)),
-                 column(width=4,
-                        valueBoxOutput("trustee_active_grants",width = NULL),
-                        infoBoxOutput("trustee_grants_amounts",width = NULL)),
-                 column(width=4,
-                        infoBoxOutput("trustee_closing_in_months",width = NULL),
-                        valueBoxOutput("trustee_grants_closing_6",width = NULL))),
-                 fluidRow(
-                 plotlyOutput("trustee_dis_GG",height = 100)),
-                 fluidRow(tabsetPanel(tabPanel(
+                   tabsetPanel(
+                     tabPanel(title="Overview",
+                              fluidRow(
+                       column(width=4,
+                              valueBoxOutput("fund_contributions",width = NULL),
+                              valueBoxOutput("trustee_closing_in_months",width = NULL)),
+                       column(width=4,
+                              valueBoxOutput("trustee_received",width = NULL),
+                              valueBoxOutput("trustee_unpaid",width = NULL)),
+                              #infoBoxOutput("trustee_grants_amounts",width = NULL)),
+                       column(width=4,
+                              valueBoxOutput("trustee_active_grants",width = NULL),
+                              valueBoxOutput("trustee_grants_closing_6",width = NULL))),
+                       fluidRow(
+                         plotlyOutput("trustee_dis_GG",height = 100))),
+                     tabPanel(
                    title="Grants per Region",
                    plotlyOutput(outputId = "trustee_region_n_grants_GG",width = 1000, height=300)),
                    tabPanel(
@@ -223,39 +225,33 @@ tab.3 <-  tabItem(tabName = "regions",
                           title = "Overview",
                           fluidRow(
                             column(
-                              width = 6,
-                              wellPanel(
+                              width = 4,
                                 infoBoxOutput(outputId = "focal_active_grants",
                                               width = NULL),
                                 infoBoxOutput(outputId = "focal_active_funds",
-                                              width = NULL),
-                                plotlyOutput("region_remaining_committed_disbursed", height = 100)
-                              )
-                            ),
+                                              width = NULL)
+                              ),
                             column(
-                              width = 3,
+                              width = 4,
                               valueBoxOutput(outputId = "focal_grants_closing_3",
                                              width = NULL),
                               valueBoxOutput(outputId = "focal_grants_active_3_zero_dis",
                                              width = NULL)
                             ),
                             column(
-                              width = 3,
+                              width = 4,
                               valueBoxOutput(outputId = "region_grants_may_need_transfer",
                                              width = NULL),
                               valueBoxOutput(outputId = "region_grants_active_no_transfer",
                                              width = NULL)
                             )
+                            
                           ),
-                          tabsetPanel(
-                            tabPanel(
-                              title = "Parent Fund",
-                              plotlyOutput(outputId = "focal_region_n_grants_GG", width = 1000)
-                            ),
+                          fluidRow(
+                            plotlyOutput("region_remaining_committed_disbursed", height = 100)
+                          )),
                             tabPanel(title = "Global Themes",
-                                     plotlyOutput(outputId = "region_GP_GG", width = 1200,height=500))
-                          )
-                        ),
+                                     plotlyOutput(outputId = "region_GP_GG", width = 1200,height=500)),
                         tabPanel(
                           title = "Disbursement Risk",
                           fluidRow(
@@ -293,14 +289,18 @@ tab.3 <-  tabItem(tabName = "regions",
                                                        "Open test version excel Report"))
                           )
                         ),
+                        tabPanel(title="Funding Sources",tabsetPanel(tabPanel(
+                          title = "Summary Plot",
+                          plotlyOutput(outputId = "focal_region_n_grants_GG", width = 1100,height=100*5)
+                        ),
                         tabPanel(
-                          title = "Funding Source",
+                          title = "Summary Table",
                           DT::dataTableOutput(outputId = "region_funding_source_grants_table"),
                           fluidRow(column(3,offset = 1,
                                           downloadButton("generate_full_excel_report_3",
                                                        "Open draft excel Report"))
                           )
-                        ),
+                        ))),
                         tabPanel(
                           title = "RETF grants",
                           fluidRow(

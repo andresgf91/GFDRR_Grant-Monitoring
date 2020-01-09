@@ -670,14 +670,14 @@ server <- shinyServer(function(input,output,session) {
       })
     })
   
-      output$fund_contributions <- renderInfoBox({
+      output$fund_contributions <- renderValueBox({
         
         temp_active_trustee <- reactive_active_trustee()
         sum(temp_active_trustee$`Net Signed Condribution in USD`) %>% dollar %>% 
-          infoBox("Fund Size",value=.)
+          valueBox(subtitle = "Fund Size",value=.)
       })
       
-      output$trustee_received <- renderInfoBox({
+      output$trustee_received <- renderValueBox({
         temp_active_trustee <- reactive_active_trustee()
         received <- sum(temp_active_trustee$`Net Paid-In Condribution in USD`) %>% dollar
         
@@ -685,10 +685,10 @@ server <- shinyServer(function(input,output,session) {
           sum(temp_active_trustee$`Net Signed Condribution in USD`),digits = 1)
         
         display <- paste0(received," (",percent,"%)")
-          infoBox("Funds received to date by Donor",value= display)
+          valueBox(subtitle="Funds received to date by Donor",value= display)
       })
       
-      output$trustee_unpaid <- renderInfoBox({
+      output$trustee_unpaid <- renderValueBox({
         
         temp_active_trustee <- reactive_active_trustee()
         unpaid <- sum(temp_active_trustee$`Net Unpaid contribution in USD`) %>% dollar
@@ -699,14 +699,14 @@ server <- shinyServer(function(input,output,session) {
           
         display <- paste0(unpaid," (",percent,"%)")
         
-        infoBox("Unpaid Contribution Amount",value=display)
+        valueBox(subtitle = "Unpaid Contribution Amount",value=display)
       })
     
-      output$trustee_grants_amounts <- renderInfoBox({
+      output$trustee_grants_amounts <- renderValueBox({
         
         temp_grants <- reactive_grants_trustee()
         sum(temp_grants$`Grant Amount USD`) %>% dollar %>% 
-          infoBox("Total Awarded Amount",value=.)
+          valueBox(subtitle = "Total Awarded Amount",value=.)
       })
       
       output$trustee_dis_GG <- renderPlotly({
@@ -830,10 +830,10 @@ server <- shinyServer(function(input,output,session) {
       })
       
       
-      output$trustee_closing_in_months <- renderInfoBox({
+      output$trustee_closing_in_months <- renderValueBox({
         temp_active_trustee <- reactive_active_trustee()
         temp_active_trustee$months_to_end_disbursement %>% 
-          infoBox("Months until fund closing date:",value=.,icon = icon("stopwatch"))
+          valueBox(subtitle = "Months until fund closing date:",value=.,icon = icon("stopwatch"))
       })
       
       output$trustee_region_n_grants_GG <- renderPlotly({

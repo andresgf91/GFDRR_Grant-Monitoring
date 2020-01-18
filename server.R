@@ -26,64 +26,151 @@ server <- shinyServer(function(input,output,session) {
 # TAB.1 -------------------------------------------------------------------
 
     output$plot1 <- renderPlotly({
-      plotly::ggplotly(trustee_contributions_GG,tooltip="text")
+      
+      melted_contributions <- active_trustee %>%
+        filter(`Net Paid-In Condribution in USD`!=0) %>% arrange(`Net Signed Condribution in USD`) %>% 
+        select(temp.name,
+               `Net Unpaid contribution in USD`,
+               `Net Paid-In Condribution in USD`) %>% 
+        reshape2::melt() %>%
+        inner_join(active_trustee %>% arrange(`Net Signed Condribution in USD`) %>% 
+                     filter(`Net Paid-In Condribution in USD`!=0) %>% 
+                     select(temp.name,
+                            `Net Unpaid contribution in USD`,
+                            `Net Paid-In Condribution in USD`),.,by="temp.name")
+      
+      melted_contributions <- melted_contributions %>%
+        dplyr::mutate(variable=ifelse(variable=="Net Unpaid contribution in USD",
+                                      "Un-paid","Paid"))
+      
+      trustee_contributions_GG <- ggplot(melted_contributions,
+                                         aes(
+                                           reorder(temp.name,
+                                                   value, sum),
+                                           value / 1000000,
+                                           fill = variable,
+                                           text = paste0("Trustee: ", temp.name, "\n",
+                                                         variable, ": ", dollar(value))
+                                         )) +
+        geom_bar(stat = "identity") +
+        theme_classic() +
+        labs(y = "Expected Contribution (USD M)",
+             x = "Trustee") +
+        #theme(axis.text.x = element_text(angle=90)) +
+        coord_flip() +
+        #scale_fill_discrete(name = "Contributions", labels = c("Un-paid", "Paid")) +
+        scale_fill_manual(name=NULL,values = c("#2E2EFE", "#CED8F6", "#56B4E9")) #+
+       # theme(
+       #   rect = element_rect(fill = "transparent"),
+       #   plot.background = element_rect(fill = "transparent", color = NA),
+       #   panel.background = element_rect(fill = "transparent")
+      #  ) 
+      
+      ggplotly(trustee_contributions_GG,tooltip = "text")
+      
+      
       })
     
-    output$total_contributions <- renderInfoBox({
+    output$total_contributions <- renderValueBox({
       sum(active_trustee$`Net Signed Condribution in USD`) %>%
       dollar(accuracy = 1) %>% 
-      infoBox(
-        "Total Pledged", ., icon = icon("money-check-alt"),
-        color = "blue", subtitle = "*all active trustees")
+      valueBox(value=tags$p(., style = "font-size: 75%;"),
+               icon = icon("money-check-alt"),
+               color = "navy",
+               subtitle = "Total Pledged")
       })
     
-    output$total_received <- renderInfoBox({
+    output$total_received <- renderValueBox({
       sum(active_trustee$`Net Paid-In Condribution in USD`) %>% 
       dollar(accuracy = 1) %>% 
-      infoBox(
-        "Total Received", ., icon = icon("hand-holding-usd"),
-        color = "blue", subtitle = "*all active trustees")
-      
+      valueBox( value=tags$p(., style = "font-size: 75%;"), icon = icon("hand-holding-usd"),
+        color = "blue", subtitle = "Total Received")
       })
     
-    output$total_unpaid <- renderInfoBox({
+    output$total_unpaid <- renderValueBox({
       sum(active_trustee$`Net Unpaid contribution in USD`) %>% 
       dollar(accuracy = 1)%>% 
-        infoBox(
-          "Total Pending (Un-paid)", ., icon = icon("file-invoice-dollar"),
-          color = "blue", subtitle = "*all active trustees")
+        valueBox(
+          value= tags$p(., style = "font-size: 75%;"), icon = icon("file-invoice-dollar"),
+          color = "light-blue", subtitle = "Total Pending (Un-paid)")
       
       })
+
+    output$elpie <- renderPlotly({
+      
+      temp_df <- grants %>%
+        filter(`Fund Status`=="ACTV") %>% 
+        mutate(PMA= ifelse(PMA=="yes","PMA","Operational")) %>% 
+          group_by(PMA) %>%
+        summarise(n_grants = n(),
+                  remaining_balance = round(sum(unnacounted_amount)),
+                  total_award_amount= sum(`Grant Amount USD`))
+      
+      total <- sum(temp_df$total_award_amount)
+      
+      m <- list(
+        l = 15,
+        r = 2,
+        b = 10,
+        t = 20,
+        pad = 4
+      )
+      
+      colors <- c('rgb(17,71,250)','rgb(192,207,255)')
     
-    output$total_remaining_balance <- renderInfoBox({
+      plot_ly(textposition="outside") %>%
+        add_pie(title="Number of Grants",
+          data = temp_df,
+                labels=~PMA,
+                values = ~n_grants,
+                domain = list(x = c(0, 0.47),
+                              y = c(0.1, 1)),
+                            name = paste0("Active","\n", "Grants"),
+                textinfo="value",
+                            marker = list(colors=colors),
+                            hole = 0.75) %>% 
+        add_pie(title="Uncommitted Balance",
+          data=temp_df,
+                labels = ~PMA,
+                values = ~remaining_balance,
+                text = ~paste(dollar(remaining_balance,scale = 1/1000000,accuracy = .1),"M"),
+                hoverinfo = 'label+text+name+value',
+                textinfo = 'text',
+                hole = 0.75,
+                name = paste0("Uncommitted","\n","Balance"),
+                domain = list(x = c(0.49, .96),
+                              y = c(0.1, 1))) %>%
+        layout(xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+               yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+               margin=m)
+    })
+    
+    output$total_remaining_balance <- renderValueBox({
       
      temp_grants <- grants %>% filter(Trustee %in% active_trustee$Fund,
                                       `Fund Status`=="ACTV")
       sum(temp_grants$unnacounted_amount) %>% 
       dollar(accuracy = 1)%>% 
-        infoBox(
-          "Available Balance", ., icon = icon("receipt"),
-          color = "blue", subtitle = "*all active grants")
+        valueBox(value=., icon = icon("receipt"),
+          color = "blue", subtitle =  "Available Balance")
       })
     
-    output$`closing<12` <- renderInfoBox({
+    output$`closing<12` <- renderValueBox({
       
         active_trustee %>%
         filter(months_to_end_disbursement<=12) %>% nrow() %>% 
-        infoBox(
-          "Trustees closing in < 12 months",
-          .,
+        valueBox(
+          value=.,
           icon = icon("stopwatch"),
-          color = "orange",
-          subtitle = HTML("<button id=\"show_trustees_6months\" type=\"button\" class=\"btn btn-default action-button\">Show Trustees</button>"))
+          color="aqua",
+          subtitle = HTML("Trustees closing in less than 12 months </><button id=\"show_trustees_6months\" type=\"button\" class=\"btn btn-default action-button\">Show Trustees</button>"))
     })
     
     
     observeEvent(input$show_trustees_6months, {
       data <-  active_trustee %>%
-        filter(months_to_end_disbursement<=12) %>%
+        filter(months_to_end_disbursement <= 12) %>%
         select(Fund,
-               `Fund Name`,
                temp.name,
                `Fund TTL Name`,
                `Net Signed Condribution in USD`,
@@ -94,10 +181,10 @@ server <- shinyServer(function(input,output,session) {
         arrange(months_to_end_disbursement) %>%
         rename("Months Left to Disburse" = months_to_end_disbursement,
                "Short Name"= temp.name) %>% 
-        mutate(`Net Signed Condribution in USD`=dollar(`Net Signed Condribution in USD`,accuracy = 1),
-               `Net Unpaid contribution in USD`=dollar(`Net Unpaid contribution in USD`,accuracy = 1),
-               `Available Balance USD`=dollar(`Available Balance USD`,accuracy = 1),
-               `Months Left to Disburse`=round(`Months Left to Disburse`,digits = 0))
+        mutate(`Net Signed Condribution in USD`= dollar(`Net Signed Condribution in USD`,accuracy = 1),
+               `Net Unpaid contribution in USD`= dollar(`Net Unpaid contribution in USD`,accuracy = 1),
+               `Available Balance USD`= dollar(`Available Balance USD`,accuracy = 1),
+               `Months Left to Disburse`= round(`Months Left to Disburse`,digits = 0))
       
       showModal(modalDialog(size = 'l',
                             title = "Trustees Closing in less than 12 months",
@@ -107,24 +194,24 @@ server <- shinyServer(function(input,output,session) {
     })
     
     
+    shinyjs::addClass(id = "overview", class = "navbar-right")
     
     
-    
-    output$`closing<6` <- renderInfoBox({
+    output$`closing<6` <- renderValueBox({
       active_trustee %>%
-        filter(months_to_end_disbursement<=6) %>% nrow() %>% 
-        infoBox(
+        filter(months_to_end_disbursement <= 6) %>% nrow() %>% 
+        valueBox(
           "Trustees closing in < 6 months",
           .,
           icon = icon("stopwatch"),
           color = "red")
     })
     
-    output$all_grants_amount <- renderInfoBox({
+    output$all_grants_amount <- renderValueBox({
     
       temp_grants <- grants %>% filter(Trustee %in% active_trustee$Trustee)
       sum(temp_grants$`Grant Amount USD`) %>% dollar() %>% 
-        infoBox(
+        valueBox(
           "Amount awarded in grants",
           .,
           icon = icon("stopwatch"),
@@ -182,14 +269,14 @@ server <- shinyServer(function(input,output,session) {
     output$number_active_grants <- renderValueBox({
       
       temp_grants <- grants %>%
-        filter(`Fund Status` == "ACTV") %>% select(Fund) %>% 
+        filter(`Fund Status` == "ACTV") %>%
+        select(Fund) %>% 
         distinct() %>% nrow() %>% 
         valueBox(.,
           subtitle = "All Active Grants",
           icon = icon("list-ol"),
           color = "blue")
     })
-    
     
     #OPERATIONAL GRANTS ONLY 
     
@@ -205,21 +292,18 @@ server <- shinyServer(function(input,output,session) {
     })
     
     
-    output$total_remaining_balance_op <- renderInfoBox({
+    output$total_remaining_balance_op <- renderValueBox({
       
       temp_grants <- grants %>% filter(Trustee %in% active_trustee$Fund,
                                        `Fund Status`=="ACTV",PMA=="no")
       sum(temp_grants$unnacounted_amount) %>% 
         dollar()%>% 
-        infoBox(
+        valueBox(
           "Available Balance", ., icon = icon("receipt"),
           color = "green", subtitle = "*operational grants")
     })
     
-  
-    
-    
-    
+
     output$overview_progress_GG_op <- renderPlotly({
       
       temp_df <- grants %>% filter(`Fund Status`=="ACTV",PMA=="no")
@@ -266,7 +350,6 @@ server <- shinyServer(function(input,output,session) {
                              traceorder="reversed"))
     })
     
-    
     #PMA grant number
     output$number_active_grants_pma <- renderValueBox({
       
@@ -279,13 +362,13 @@ server <- shinyServer(function(input,output,session) {
                  color = "yellow")
     })
     
-    output$total_remaining_balance_pma <- renderInfoBox({
+    output$total_remaining_balance_pma <- renderValueBox({
       
       temp_grants <- grants %>% filter(Trustee %in% active_trustee$Fund,
                                        `Fund Status`=="ACTV",PMA=="yes")
       sum(temp_grants$unnacounted_amount) %>% 
         dollar()%>% 
-        infoBox(
+        valueBox(
           "Available Balance", ., icon = icon("receipt"),
           color = "yellow", subtitle = "*PMA grants")
     })
@@ -336,11 +419,7 @@ server <- shinyServer(function(input,output,session) {
                              traceorder="reversed"))
     })
     
-    
-    
-    
-    
-    
+
     # output$region_GP_GG <- renderPlotly({
     #   
     #   remove_num <- function(x){
@@ -383,11 +462,11 @@ server <- shinyServer(function(input,output,session) {
                               dollar(total_award_amount)))) +
         geom_col(fill='royalblue',alpha=.7) +
         theme_classic() +
-        labs(x="Region", y="Number of Grants",
-             title="Active Operational Grants by Region")+
-        theme(rect = element_rect(fill="transparent"),
-              plot.background = element_rect(fill="transparent",color=NA),
-              panel.background = element_rect(fill="transparent")) 
+        labs(x="Region", y="Number of Grants")
+      # +
+      #   theme(rect = element_rect(fill="transparent"),
+      #         plot.background = element_rect(fill="transparent",color=NA),
+      #         panel.background = element_rect(fill="transparent")) 
       
       plotly::ggplotly(gg, tooltip = "text") 
       
@@ -405,10 +484,10 @@ server <- shinyServer(function(input,output,session) {
       total <- sum(data$total_award_amount)
       
       m <- list(
-        l = 40,
+        l = 20,
         r = 20,
-        b = 70,
-        t = 50,
+        b = 10,
+        t = 20,
         pad = 4
       )
       
@@ -422,7 +501,7 @@ server <- shinyServer(function(input,output,session) {
               type = 'pie') %>%
         layout(xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
                yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
-               title="Funding by Region", margin=m)
+              margin=m)
     })
     
     
@@ -443,8 +522,8 @@ server <- shinyServer(function(input,output,session) {
       m <- list(
         l = 40,
         r = 20,
-        b = 70,
-        t = 50,
+        b = 40,
+        t = 30,
         pad = 4
       )
       
@@ -456,10 +535,11 @@ server <- shinyServer(function(input,output,session) {
                              "\n","(",n_grants," grants)"),
               hoverinfo = 'label+value+text',
               textinfo = 'text',
-              type = 'pie') %>%
+              type = 'pie',
+              rotation=75) %>%
         layout(xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
                yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
-               title="Funding by Global Theme", margin=m)
+               margin=m,showlegend = FALSE)
       
       
     })
@@ -626,9 +706,6 @@ server <- shinyServer(function(input,output,session) {
       
     })
     
-    
-  
-
 # TAB.2 -------------------------------------------------------------------
 
     reactive_active_trustee <- reactive({
@@ -765,8 +842,6 @@ server <- shinyServer(function(input,output,session) {
                    width=NULL)
       })
       
-      
-      
       observeEvent(input$show_active_grants_trustee, {
         temp_grants <- reactive_grants_trustee()
         
@@ -802,7 +877,6 @@ server <- shinyServer(function(input,output,session) {
         
       })
       
-      
       observeEvent(input$show_grants_closing_6, {
         temp_grants <- reactive_grants_trustee()
         
@@ -828,8 +902,7 @@ server <- shinyServer(function(input,output,session) {
                               easyClose = TRUE))
         
       })
-      
-      
+
       output$trustee_closing_in_months <- renderValueBox({
         temp_active_trustee <- reactive_active_trustee()
         temp_active_trustee$months_to_end_disbursement %>% 
@@ -918,7 +991,7 @@ server <- shinyServer(function(input,output,session) {
                                      "Non-GPURL"))
     })
       
-      reactive_df_2 <- reactive({
+    reactive_df_2 <- reactive({
         
         grants %>%
           filter(Region %in% input$focal_select_region,
@@ -927,7 +1000,7 @@ server <- shinyServer(function(input,output,session) {
           filter(`DF Execution Type` =="RE")
       })
       
-      reactive_summary <- reactive({
+    reactive_summary <- reactive({
         
         grants %>%
           filter(Region %in% input$focal_select_region,
@@ -979,7 +1052,6 @@ server <- shinyServer(function(input,output,session) {
 
    })
 
-
     observeEvent(input$focal_select_trustee,{
 
       if (!is.null(input$focal_select_trustee)){
@@ -1016,7 +1088,6 @@ server <- shinyServer(function(input,output,session) {
       
     })
     
-    
     output$date_data_updated_message <- renderMenu({
       dropdownMenu(type="notifications",
                    notificationItem(text = paste("Dashboard data as of:",
@@ -1034,25 +1105,25 @@ server <- shinyServer(function(input,output,session) {
         data <- reactive_df()
         data$`Fund Country Region Name`[1]})
   
-      output$focal_active_grants <- renderInfoBox({
+      output$focal_active_grants <- renderValueBox({
         
         data <- reactive_df()
         data %>% nrow() %>%
-        infoBox(title = "Number of Active Grants",
+        valueBox(subtitle = "Active Grants",
                 value = . ,
-                color = 'green',
+                color = 'navy',
                 icon=icon("list-ol"))
 
       })
 
 
-      output$focal_active_funds <- renderInfoBox({
+      output$focal_active_funds <- renderValueBox({
         temp_df <- reactive_df()
         
        temp_df %>% filter(`Fund Status`=="ACTV") %>%
           select(`Grant Amount USD`) %>%
           summarise(sum(`Grant Amount USD`)) %>% as.numeric %>% dollar() %>%
-          infoBox(title = "Total Active Awards",value = . , color = 'green')
+          valueBox(subtitle = "Total Funding",value = . , color = 'navy')
       })
       
 
@@ -1861,7 +1932,7 @@ server <- shinyServer(function(input,output,session) {
         temp_df %>% filter(funds_to_be_transferred > 1,percent_transferred_available<.3) %>%
           nrow() %>%
           valueBox(value = .,
-                   subtitle = HTML("<b>Grants that may require funds transferred</b> <button id=\"show_grants_need_transfer\" type=\"button\" class=\"btn btn-default action-button\">Show Grants</button>"),
+                   subtitle = HTML("Grants may require funds transferred <> <button id=\"show_grants_need_transfer\" type=\"button\" class=\"btn btn-default action-button\">Show Grants</button>"),
                    color = 'orange')
 
       })
@@ -2377,10 +2448,10 @@ server <- shinyServer(function(input,output,session) {
     
     
 # TAB.4 PMA -------------------------------------
-    output$resources_available <- renderInfoBox({
+    output$resources_available <- renderValueBox({
       sum(PMA_grants$unnacounted_amount) %>%
         dollar() %>% 
-      infoBox("Active PMA Resources Available",value=.,color = 'green')
+      valueBox("PMA Unnacounted Balance",value=.,color = 'green')
       
     })
   
@@ -2425,16 +2496,16 @@ server <- shinyServer(function(input,output,session) {
     
     
     
-    output$current_quarter <- renderInfoBox({
+    output$current_quarter <- renderValueBox({
       current_Q_date <- zoo::as.yearqtr(date_data_udpated) %>% as_date()
       
       current_Q_amount <- grouped_gg_data[grouped_gg_data$quarterr==current_Q_date,] [1,6] %>%
         as.numeric()
       
-      infoBox("Available in Current Quarter",
+      valueBox("Available in Current Quarter",
               value = dollar(current_Q_amount),icon = icon("wallet")) })
       
-      output$next_quarter <- renderInfoBox({
+      output$next_quarter <- renderValueBox({
         current_Q_date <- zoo::as.yearqtr(date_data_udpated) %>% as_date() 
         
         next_Q_date <- current_Q_date %m+% months(3) %>% as_date()
@@ -2447,15 +2518,15 @@ server <- shinyServer(function(input,output,session) {
         arrow_icon <- ifelse(current_Q_amount==next_Q_amount,"arrow-right",
                        ifelse(current_Q_amount<next_Q_amount,"arrow-up","arrow-down"))
         
-        infoBox("Available in next Quarter",
+        valueBox("Available in next Quarter",
                 value = dollar(next_Q_amount),icon = icon(as.character(arrow_icon)))
       
       })
       
-        output$PMA_grants_n <- renderInfoBox({
+        output$PMA_grants_n <- renderValueBox({
           
           PMA_grants %>% filter(`Fund Status`=="ACTV") %>% nrow() %>% 
-          infoBox("Active PMA Grants",
+          valueBox("Active PMA Grants",
                   value = .,icon = icon("list-ol"),
                   subtitle = HTML("<button id=\"show_PMA_grants\" type=\"button\" class=\"btn btn-default action-button\">Show Grants</button>"))
           

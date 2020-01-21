@@ -21,6 +21,14 @@ library(openxlsx)
 
 # Define server logic required to draw a histogram
 server <- shinyServer(function(input,output,session) {
+  
+  show_grant_button <-  function(title,id_name){    HTML(paste0(title,
+                                                                "<button id=",id_name,
+                                                                " type=\"button\"",
+                                                                "class=\"btn btn-default action-button\"",
+                                                                "style=\"padding:2px; font-size:80%\">Show</button>")
+  ) 
+  }
 
    message_df <- data.frame()
 # TAB.1 -------------------------------------------------------------------
@@ -74,7 +82,7 @@ server <- shinyServer(function(input,output,session) {
     output$total_contributions <- renderValueBox({
       sum(active_trustee$`Net Signed Condribution in USD`) %>%
       dollar(accuracy = 1) %>% 
-      valueBox(value=tags$p(., style = "font-size: 75%;"),
+      valueBox(value=tags$p(., style = "font-size: 60%;"),
                icon = icon("money-check-alt"),
                color = "navy",
                subtitle = "Total Pledged")
@@ -83,7 +91,7 @@ server <- shinyServer(function(input,output,session) {
     output$total_received <- renderValueBox({
       sum(active_trustee$`Net Paid-In Condribution in USD`) %>% 
       dollar(accuracy = 1) %>% 
-      valueBox( value=tags$p(., style = "font-size: 75%;"), icon = icon("hand-holding-usd"),
+      valueBox( value=tags$p(., style = "font-size: 60%;"), icon = icon("hand-holding-usd"),
         color = "blue", subtitle = "Total Received")
       })
     
@@ -91,7 +99,7 @@ server <- shinyServer(function(input,output,session) {
       sum(active_trustee$`Net Unpaid contribution in USD`) %>% 
       dollar(accuracy = 1)%>% 
         valueBox(
-          value= tags$p(., style = "font-size: 75%;"), icon = icon("file-invoice-dollar"),
+          value= tags$p(., style = "font-size: 60%;"), icon = icon("file-invoice-dollar"),
           color = "light-blue", subtitle = "Total Pending (Un-paid)")
       
       })
@@ -163,7 +171,9 @@ server <- shinyServer(function(input,output,session) {
           value=.,
           icon = icon("stopwatch"),
           color="aqua",
-          subtitle = HTML("Trustees closing in less than 12 months </><button id=\"show_trustees_6months\" type=\"button\" class=\"btn btn-default action-button\">Show Trustees</button>"))
+          subtitle = show_grant_button("Trustees closing in less than 12 months",
+                                       "show_trustees_6months")
+          )
     })
     
     
@@ -256,7 +266,7 @@ server <- shinyServer(function(input,output,session) {
         coord_flip() +
         scale_fill_discrete(breaks=c("Available Balance","Committed","Disbursed")) +
         scale_fill_brewer(palette = "Blues") +
-        geom_text(size = 3, position = position_stack(vjust = 0.5),) 
+        geom_text(size = 3, position = position_stack(vjust = 0.5)) 
       
       plotly::ggplotly(gg, tooltip = "text") %>%
         layout(legend = list(orientation = 'h',
@@ -341,7 +351,7 @@ server <- shinyServer(function(input,output,session) {
         coord_flip() +
         scale_fill_discrete(breaks=c("Available Balance","Committed","Disbursed")) +
         scale_fill_brewer(palette = "Blues") +
-        geom_text(size = 3, position = position_stack(vjust = 0.5),) 
+        geom_text(size = 3, position = position_stack(vjust = 0.5)) 
       
       plotly::ggplotly(gg, tooltip = "text") %>%
         layout(legend = list(orientation = 'h',
@@ -410,7 +420,7 @@ server <- shinyServer(function(input,output,session) {
         coord_flip() +
         scale_fill_discrete(breaks=c("Available Balance","Committed","Disbursed")) +
         scale_fill_brewer(palette = "Blues") +
-        geom_text(size = 3, position = position_stack(vjust = 0.5),) 
+        geom_text(size = 3, position = position_stack(vjust = 0.5)) 
       
       plotly::ggplotly(gg, tooltip = "text") %>%
         layout(legend = list(orientation = 'h',
@@ -419,32 +429,6 @@ server <- shinyServer(function(input,output,session) {
                              traceorder="reversed"))
     })
     
-
-    # output$region_GP_GG <- renderPlotly({
-    #   
-    #   remove_num <- function(x){
-    #     word <- x
-    #     letter <- stri_sub(x,5)
-    #     if(letter %in% c("1","2","3","4","5","6","7","8","9")){
-    #       return(stri_sub(x,1,4))} else{
-    #         return(stri_sub(word))
-    #       }
-    #   }
-    #   
-    #   temp_df <- grants %>% filter(`Fund Status`=="ACTV")
-    #   
-    #   temp_df$aggregate_unit <- sapply(temp_df$`TTL Unit Name`, function(x) remove_num(x)) %>% as.vector()
-    #   data <- temp_df %>% 
-    #     group_by(`aggregate_unit`) %>% 
-    #     summarise(n_grants = n(), total_award_amount = sum(`Grant Amount USD`))
-    #   
-    #   plot_ly(data, labels = ~aggregate_unit, values = ~total_award_amount, type = 'pie') %>%
-    #     layout(xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
-    #            yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE))
-    #   
-    #    
-    # })
-    # 
     
     output$n_grants_region <- renderPlotly({
       
@@ -485,10 +469,10 @@ server <- shinyServer(function(input,output,session) {
       
       m <- list(
         l = 20,
-        r = 20,
+        r = 5,
         b = 10,
-        t = 20,
-        pad = 4
+        t = 10,
+        pad = 2
       )
       
       plot_ly(data,
@@ -497,8 +481,9 @@ server <- shinyServer(function(input,output,session) {
               text = ~paste0(round(total_award_amount/total*100,digits=1)," %",
                             "\n","(",n_grants," grants)"),
               hoverinfo = 'label+value+text',
-              textinfo = 'text',
-              type = 'pie') %>%
+              textinfo = 'percent',
+              type = 'pie',
+              rotation=75) %>%
         layout(xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
                yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
               margin=m)
@@ -520,7 +505,7 @@ server <- shinyServer(function(input,output,session) {
         summarise(n_grants=sum(n_grants),
                   total_award_amount=sum(total_award_amount))
       m <- list(
-        l = 40,
+        l = 50,
         r = 20,
         b = 40,
         t = 30,
@@ -531,10 +516,10 @@ server <- shinyServer(function(input,output,session) {
       plot_ly(data,
               labels = ~pie_name,
               values = ~total_award_amount,
-              text = ~paste0(round(total_award_amount/total*100,digits=1)," %",
+              text = ~paste0(round(total_award_amount/total*100,digits=1)," % of total funding",
                              "\n","(",n_grants," grants)"),
               hoverinfo = 'label+value+text',
-              textinfo = 'text',
+              textinfo = 'percent',
               type = 'pie',
               rotation=75) %>%
         layout(xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
@@ -986,9 +971,7 @@ server <- shinyServer(function(input,output,session) {
                  `Fund Status`=="ACTV") %>% 
           filter(temp.name %in% input$focal_select_trustee) %>% 
         filter(`DF Execution Type` %in% input$region_BE_RE) %>%
-        mutate(GPURL_binary = ifelse(`Lead GP/Global Themes`=="Urban, Resilience and Land",
-                                     "GPURL",
-                                     "Non-GPURL"))
+        filter(PMA.2 %in% input$region_PMA_or_not)
     })
       
     reactive_df_2 <- reactive({
@@ -1009,13 +992,15 @@ server <- shinyServer(function(input,output,session) {
           filter(`DF Execution Type` %in% input$region_BE_RE) %>%
           mutate(GPURL_binary = ifelse(`Lead GP/Global Themes`=="Urban, Resilience and Land",
                                        "GPURL",
-                                       "Non-GPURL")) %>% 
-          filter(`Closing Date` < as.Date(input$"summary_table_cutoff_date"))
+                                       "Non-GPURL")) %>%
+        filter(PMA.2 %in% input$region_PMA_or_not)
+      #%>% 
+         # filter(`Closing Date` < as.Date(input$"summary_table_cutoff_date"))
         
         
       })
       
-      reactive_country_regions <- reactive({
+    reactive_country_regions <- reactive({
         
         grants %>%
           filter(Region %in% input$focal_select_region,
@@ -1028,9 +1013,9 @@ server <- shinyServer(function(input,output,session) {
         
       })
     
-    data <- reactiveValues(focal_grants = grants, percent_df= NA, region_grants=grants)
+    data <- reactiveValues(focal_grants = grants, percent_df = NA, region_grants = grants)
   
-     observeEvent(input$focal_select_region,{
+    observeEvent(input$focal_select_region,{
      data$region_grants <- grants %>%
        filter(Region %in% input$focal_select_region,
               `Fund Status`=="ACTV") 
@@ -1110,23 +1095,64 @@ server <- shinyServer(function(input,output,session) {
         data <- reactive_df()
         data %>% nrow() %>%
         valueBox(subtitle = "Active Grants",
-                value = . ,
+                value = tags$p(., style = "font-size: 85%;"),
                 color = 'navy',
                 icon=icon("list-ol"))
 
       })
-
+      
+      
+      output$elpie2 <- renderPlotly({
+        
+        temp_df <- reactive_df()
+        temp_df <- temp_df %>% 
+          summarise("Disbursed" = sum(`Disbursements USD`),
+                    "Uncommitted" = round(sum(unnacounted_amount)),
+                    "Committed"= sum(`Commitments USD`)) %>% reshape2::melt()
+        
+        temp_df$percentage <- temp_df$value/sum(temp_df$value)
+        
+        total <- sum(temp_df$value)
+        
+        m <- list(
+          l = 0,
+          r = 0,
+          b = 10,
+          t = 10,
+          pad = 4
+        )
+        
+        colors <- c('rgb(17,71,250)','rgb(192,192,192)','rgb(192,207,255)')
+        
+        plot_ly(textposition="outside") %>%
+          add_pie(#title="Disbursement Summary",
+                  data = temp_df,
+                  labels=~variable,
+                  values = ~value,
+                  textinfo= ~percentage,
+                  hoverinfo= ~paste0(variable,"\n",dollar(value),percent(percentage)),
+                  marker = list(colors=colors),
+                  hole = 0.75) %>% 
+          layout(xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+                 yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+                 margin=m,
+                 legend = list(orientation = 'h',font = list(size = 9), x=0.25, y=-0.01))
+      })
+      
 
       output$focal_active_funds <- renderValueBox({
         temp_df <- reactive_df()
         
-       temp_df %>% filter(`Fund Status`=="ACTV") %>%
-          select(`Grant Amount USD`) %>%
-          summarise(sum(`Grant Amount USD`)) %>% as.numeric %>% dollar() %>%
-          valueBox(subtitle = "Total Funding",value = . , color = 'navy')
+       temp_df %>%
+          select(`Grant Amount USD`)
+       valor <- sum(temp_df$`Grant Amount USD`) %>%
+          as.numeric() %>%
+          dollar()
+         valueBox(subtitle = "Total Funding",
+                   value =tags$p(valor, style = "font-size: 65%;"),
+                   color = 'navy')
       })
       
-
       output$region_remaining_committed_disbursed <- renderPlotly({
         
         temp_df <- reactive_df()
@@ -1191,10 +1217,7 @@ server <- shinyServer(function(input,output,session) {
           geom_col(fill='royalblue') +
           theme_classic() +
           coord_flip() +
-          labs(x="Trustee Name", y="Number of Grants")+
-          theme(rect = element_rect(fill="transparent"),
-                plot.background = element_rect(fill="transparent",color=NA),
-                panel.background = element_rect(fill="transparent")) 
+          labs(x="Trustee Name", y="Number of Grants")
 
        plotly::ggplotly(gg, tooltip = "text")
 
@@ -1220,10 +1243,10 @@ server <- shinyServer(function(input,output,session) {
          
          
          m <- list(
-           l = 40,
-           r = 20,
-           b = 70,
-           t = 50,
+           l = 10,
+           r = 10,
+           b = 10,
+           t = 10,
            pad = 4
          )
          
@@ -1231,10 +1254,13 @@ server <- shinyServer(function(input,output,session) {
                  labels = ~pie_name,
                  values = ~total_award_amount,
                  text = ~paste0(percent(total_award_amount/total,accuracy = .1),
-                                "\n","(",n_grants," grants)"),
-                 hoverinfo = 'label+value+text',
-                 textinfo = 'text',
-                 type = 'pie') %>%
+                                "\n","(",n_grants," grants)",
+                                "\n", dollar(total_award_amount)),
+                 hoverinfo = 'label+text',
+                 textinfo = 'percent',
+                 type = 'pie',
+                 showlegend = FALSE,
+                 rotation=50) %>%
            layout(xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
                   yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
                   margin=m)
@@ -1277,7 +1303,7 @@ server <- shinyServer(function(input,output,session) {
           thead(
             tr(th(colspan = 1, ''),
                th(colspan = 1, ''),
-               th( colspan = 2, 'All'),
+               th(colspan = 2, 'All'),
                th(colspan = 1, ''),
                th(colspan = 2, 'GPURL'),
                th(colspan = 1, ''),
@@ -1289,31 +1315,14 @@ server <- shinyServer(function(input,output,session) {
         ))
         
         DT::datatable( data = display_df,
-                       extensions = 'Buttons',
                        options = list( 
-                         dom = "Blfrtip",
-                         paging=TRUE,
-                         buttons = 
-                           list("copy",
-                                list(
-                                  extend = "collection",
-                                  buttons = c("csv", "excel", "pdf"),
-                                  text = "Download"))
-                         
-                           # end of buttons customization
-                         
-                         # customize the length menu
-                         , lengthMenu = list( c(10, 20, -1) # declare values
-                                              , c(10, 20, "All") # declare titles
-                         ) # end of lengthMenu customization
-                         , pageLength = 10
-                         
-                         
+                         dom = "lfrtip",
+                         paging=TRUE
                        ),
                        container=sketch,
                        rownames=FALSE # end of options
                        
-            ) # end of datatables
+        )
         }) # 
         
       output$region_funding_source_grants_table <- DT::renderDataTable({
@@ -1364,33 +1373,15 @@ server <- shinyServer(function(input,output,session) {
         
         
         DT::datatable( data = display_df_funding,
-                       extensions = 'Buttons',
                        options = list( 
-                         dom = "Blfrtip",
-                         paging=TRUE,
-                         buttons = 
-                           list("copy",
-                                list(
-                                  extend = "collection",
-                                  buttons = c("csv", "excel", "pdf"),
-                                  text = "Download"))
-                         
-                         # end of buttons customization
-                         
-                         # customize the length menu
-                         , lengthMenu = list( c(10, 20, -1) # declare values
-                                              , c(10, 20, "All") # declare titles
-                         ) # end of lengthMenu customization
-                         , pageLength = 10
-                         
-                         
-                       ),
+                         dom = "lfrtip",
+                         paging=TRUE
+                         ),
                        container=sketch,
                        rownames=FALSE # end of options
                        
         )
       })
-      
       
       output$region_summary_grants_table <- DT::renderDataTable({
         
@@ -1426,12 +1417,12 @@ server <- shinyServer(function(input,output,session) {
                  `percent`=percent(`percent`))
         
         
-        cutoff_date <- as.character(input$summary_table_cutoff_date)
+        #cutoff_date <- as.character(input$summary_table_cutoff_date)
         
         sum_display_df <- data.frame("Summary"= c("Grant Count",
                                                   "Total $ (Million)",
-                                                  paste0("Total Uncommitted Balance ($) to Implement by ",cutoff_date),
-                                                  paste0("% Uncommitted Balance ($) to Implement by ",cutoff_date)),
+                                                  paste0("Total Uncommitted Balance ($)"),
+                                                  paste0("% Uncommitted Balance ($)")),
                                      "GPURL"=unname(unlist(as.list(sum_df_GPURL))),
                                      "Non-GPURL"=unname(unlist(as.list(sum_df_non_GPURL))),
                                      "Combined Total"=unname(unlist(as.list(sum_df_all))))
@@ -1439,10 +1430,9 @@ server <- shinyServer(function(input,output,session) {
         
         
 
-        DT::datatable( data = sum_display_df,
-                       extensions = 'Buttons',
+        DT::datatable( data = sum_display_df, autoHideNavigation = T,
                        options = list( 
-                         dom = "Blfrtip",
+                         dom = "rt",
                          paging=TRUE,
                          buttons = 
                            list("copy",
@@ -1460,7 +1450,6 @@ server <- shinyServer(function(input,output,session) {
                        
         )
       })
-      
       
       #-----------generate_full_excel_report_1----------      
       output$generate_full_excel_report_1 <- downloadHandler(
@@ -1910,43 +1899,53 @@ server <- shinyServer(function(input,output,session) {
       output$focal_grants_active_3_zero_dis <- renderValueBox({
         
         temp_df <- reactive_df()
-        temp_df %>% filter(tf_age_months >= 3,
+        valor <- temp_df %>% filter(tf_age_months >= 3,
                            percent_unaccounted==100) %>%
-          nrow() %>%
-          valueBox(value = .,
-                   subtitle = HTML("<b>Grants aged >= 3 months with no disbursements/committments</b> <button id=\"show_region_grants_no_discom\" type=\"button\" class=\"btn btn-default action-button\">Show Grants</button>"))
+          nrow()
+          valueBox(value = tags$p(valor, style = "font-size: 85%;"),
+                   color='navy',
+                   subtitle = show_grant_button("3 plus active mos no committment","show_region_grants_no_discom")
+                   )
 
       })
+      
+
+      
+ 
+      
       output$focal_grants_closing_3 <- renderValueBox({
         
         temp_df <- reactive_df()
-        temp_df %>% filter(months_to_end_disbursement >= 3) %>%
-          nrow() %>%
-          valueBox(value = .,
-                   subtitle = HTML("<b>Grants closing in less than 3 months</b> <button id=\"show_region_grants_closing_3\" type=\"button\" class=\"btn btn-default action-button\">Show Grants</button>"))
+        valor <- temp_df %>% filter(months_to_end_disbursement >= 3) %>%
+          nrow()
+          valueBox(value = tags$p(valor, style = "font-size: 85%;"),
+                   subtitle = show_grant_button("Closing in less than 3 months","show_region_grants_closing_3"),
+                   color = "navy")
 
       })
+      
       output$region_grants_may_need_transfer <- renderValueBox({
         
         temp_df <- reactive_df()
-        temp_df %>% filter(funds_to_be_transferred > 1,percent_transferred_available<.3) %>%
-          nrow() %>%
-          valueBox(value = .,
-                   subtitle = HTML("Grants may require funds transferred <> <button id=\"show_grants_need_transfer\" type=\"button\" class=\"btn btn-default action-button\">Show Grants</button>"),
-                   color = 'orange')
+        valor <- temp_df %>% filter(funds_to_be_transferred > 1,percent_transferred_available<.3) %>% nrow()
+          valueBox(value =tags$p(valor, style = "font-size: 85%;"),
+                   subtitle = show_grant_button(title = "May require funds transferred",
+                                                id_name = "show_grants_need_transfer"),
+                   color = 'navy')
 
       })
       output$region_grants_active_no_transfer <- renderValueBox({
         
         temp_df <- reactive_df()
-        temp_df %>% filter(`Transfer-in USD`==0) %>%
-          nrow() %>%
-          valueBox(value = .,
-                   subtitle = HTML("<b>Active Grants without initial transfer</b> <button id=\"show_grants_no_first_transfer\" type=\"button\" class=\"btn btn-default action-button\">Show Grants</button>"),
-                   color = 'orange')
+        valor <- temp_df %>% filter(`Transfer-in USD`==0) %>%
+          nrow() 
+          valueBox(value = tags$p(valor, style = "font-size: 85%;"),
+                   subtitle = show_grant_button("Active without initial transfer",
+                                                "show_grants_no_first_transfer"),
+                   color = 'navy')
         
       })
-      output$disbursement_risk_GG <- renderPlot({
+      output$disbursement_risk_GG <- renderPlotly({
        # data$focal_grants <- reactive_df()
 
         plot_title <- paste("Disbursement Risk Overview for",list(input$focal_select_region),"Region(s)")
@@ -1958,10 +1957,12 @@ server <- shinyServer(function(input,output,session) {
                                                             "Medium Risk",
                                                             "High Risk",
                                                             "Very High Risk"))
-
-        data$focal_grants %>%
+       gg <-  data$focal_grants %>%
+         group_by(disbursement_risk_level) %>% mutate(n_grants=n()) %>% 
           filter(!is.na(disbursement_risk_level)) %>%
-          ggplot(aes(x=plot_risk_name, fill=disbursement_risk_level)) +
+          ggplot(aes(x=plot_risk_name,
+                     fill=disbursement_risk_level,
+                     text = paste0(disbursement_risk_level,"\n",n_grants))) +
           geom_bar(stat='count') +
           scale_fill_manual("legend", values = c("Very High Risk" = "#C70039",
                                                  "High Risk" = "#FF5733",
@@ -1969,7 +1970,10 @@ server <- shinyServer(function(input,output,session) {
                                                  "Low Risk"= "#2ECC71")) +
           theme_minimal() +
           theme(legend.position = "none") +
-          labs(x="Risk Level", y="Number of Active Grants", title = plot_title)
+          labs(#title = plot_title,
+               x="Risk Level", y="Number of Grants")
+       
+       ggplotly(gg,tooltip='text')
 
       })
 
@@ -1978,8 +1982,9 @@ server <- shinyServer(function(input,output,session) {
        temp_df <- reactive_df()
        temp_df %>% filter(disbursement_risk_level=='Very High Risk') %>% nrow() %>%
          valueBox(value=.,
-                  subtitle =HTML("<b>Very High Risk</b> <button id=\"show_grants_VHR\" type=\"button\" class=\"btn btn-default action-button\">Show Grants</button>"),
-                  color="red")
+                  subtitle = show_grant_button("Very High Risk ",
+                                               "show_grants_VHR"),
+                  color="navy")
 
      })
 
@@ -1988,8 +1993,9 @@ server <- shinyServer(function(input,output,session) {
        temp_df <- reactive_df()
        temp_df %>% filter(disbursement_risk_level=='High Risk') %>% nrow() %>%
          valueBox(value=.,
-                  subtitle =HTML("<b>High Risk</b> <button id=\"show_grants_HR\" type=\"button\" class=\"btn btn-default action-button\">Show Grants</button>"),
-                  color="orange")
+                  subtitle = show_grant_button("High Risk ",
+                                               "show_grants_HR"),
+                  color="navy")
 
      })
 
@@ -1997,8 +2003,9 @@ server <- shinyServer(function(input,output,session) {
        temp_df <- reactive_df()
        temp_df %>% filter(disbursement_risk_level=='Medium Risk') %>% nrow() %>%
          valueBox(value=.,
-                  subtitle =HTML("<b>Medium Risk</b> <button id=\"show_grants_MR\" type=\"button\" class=\"btn btn-default action-button\">Show Grants</button>"),
-                  color="yellow")
+                  subtitle =show_grant_button("Medium Risk ",
+                                              "show_grants_MR"),
+                  color="navy")
 
      })
 
@@ -2006,10 +2013,13 @@ server <- shinyServer(function(input,output,session) {
        temp_df <- reactive_df()
        temp_df %>% filter(disbursement_risk_level=='Low Risk') %>% nrow() %>%
          valueBox(value=.,
-                  subtitle = HTML("<b>Low Risk</b> <button id=\"show_grants_LR\" type=\"button\" class=\"btn btn-default action-button\">Show Grants</button>"),
-                  color="green")
+                  subtitle = show_grant_button("Low Risk",
+                                               "show_grants_LR"),
+                  color="navy")
 
      })
+     
+     
 
     output$generate_risk_report <-  downloadHandler(
                    filename = function() {
@@ -2298,6 +2308,9 @@ server <- shinyServer(function(input,output,session) {
                             easyClose = TRUE))
 
     })
+    
+
+    
     
     observeEvent(input$show_region_grants_closing_3, {
       data <- reactive_df()

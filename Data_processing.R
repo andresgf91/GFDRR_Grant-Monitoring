@@ -283,3 +283,8 @@ grouped_gg_data <- full_join(grouped_gg_data,quarterly_total,by="quarterr")
 
 gg_df <- grouped_gg_data %>% filter(yearquarter<20210)
 
+grants$PMA.2 <- ifelse(grants$PMA=="yes","PMA","Operational")
+
+ grants <- grants %>% mutate(GPURL_binary = ifelse(`Lead GP/Global Themes`=="Urban, Resilience and Land",
+                               "GPURL",
+                               "Non-GPURL"))

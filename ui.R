@@ -4,7 +4,7 @@
 #
 # Find out more about building applications with Shiny here:
 #
-#    http://shiny.rstudio.com/
+#    http://shiny.rstudio.com/ 
 #
 
 # LOAD PACKAGES -----------------------------------------------------------
@@ -32,6 +32,7 @@ source("data_import.R")
 source('Data_processing.R')
 source("Plots.R")
 
+
 # BUILD USER INTERFACE ----------------------------------------------------
 
 ## Header ---------------
@@ -42,30 +43,41 @@ header <- dashboardHeaderPlus(
                           rightSidebarIcon = "sliders-h"
 )
 ## Sidebar ---------------
-sidebar <- dashboardSidebar(collapsed = TRUE,
-  sidebarMenu(menuItem("Secretariat View",icon = icon("dashboard"),
+
+    
+secretariat_view <-    menuItem("Secretariat View",icon = icon("dashboard"),
                        menuSubItem("Overview",
                                 tabName = "overview",
                                 icon = icon("dashboard")),
-                       menuSubItem("PMA",
-                                tabName = "PMA",
-                                icon = icon("stream")),
+                       #menuSubItem("PMA",
+                              #  tabName = "PMA",
+                              #  icon = icon("stream")),
                        menuSubItem("Other Info",
                                 tabName = "admin_info",
-                                icon = icon("stream"))),
-              menuItem("Parent Trust Fund",
+                                icon = icon("stream")))
+
+parent_trust_fund_view <-   menuItem("Parent Trust Fund",
                        tabName = "parent_tf",
-                       icon = icon("stream")),
-              menuItem("Regions",
+                       icon = icon("stream"))
+
+regions_view <-  menuItem("Regions",
                        tabName = "regions",
-                       icon = icon("receipt")),
-              menuItem("TTL/Grant Detail",
+                       icon = icon("receipt"),selected = TRUE)
+
+TTL_grant_detail <-  menuItem("TTL/Grant Detail",
                        menuSubItem("Grant View",
                                    tabName = "grant_dash",
                                    icon = icon("dashboard")),
                        menuSubItem("TTL View",
                                    tabName = "TTL_dashboard",
-                                   icon = icon("stream")))))
+                                   icon = icon("stream")))
+
+
+sidebar <- dashboardSidebar(collapsed = TRUE,
+                            sidebarMenu(regions_view,
+                                        secretariat_view,
+                                        parent_trust_fund_view,
+                                        TTL_grant_detail))
 
 ## tab.1 (Overview)---------------
 tab.1 <-  tabItem(tabName = "overview",
@@ -90,7 +102,7 @@ tab.1 <-  tabItem(tabName = "overview",
                           width = NULL,
                           collapsible = TRUE,
                           closable = F),
-                        boxPlus(plotlyOutput("funding_region", height = 400),
+                        boxPlus(plotlyOutput("funding_region", height = "260px"),
                                 title='Funding by Region',
                                 background = "blue",
                                 enable_label = T,
@@ -99,7 +111,7 @@ tab.1 <-  tabItem(tabName = "overview",
                                 collapsible = TRUE,
                                 closable = F,
                                 collapsed = TRUE),
-                        boxPlus(plotlyOutput("funding_GP", height = 400),
+                        boxPlus(plotlyOutput("funding_GP", height = "260px"),
                                 title='Funding by Global Practice',
                                 background = "blue",
                                 enable_label = T,
@@ -123,7 +135,7 @@ tab.1 <-  tabItem(tabName = "overview",
                                 collapsible = TRUE,
                                 closable = F),
                         boxPlus(
-                          plotlyOutput("plot1"),
+                          plotlyOutput("plot1",height = "260px"),
                                 title="Contributions by Trustee",
                                 width = NULL,
                           background = "blue",
@@ -133,7 +145,7 @@ tab.1 <-  tabItem(tabName = "overview",
                           closable = F)
                         #plotlyOutput("overview_progress_GG", height = 90)),
                       )
-                    ),
+                    )
                            # valueBoxOutput("number_active_grants_op", width = 5),
                              # infoBoxOutput("total_remaining_balance_op", width = 7),
                            # plotlyOutput("overview_progress_GG_op"),
@@ -231,84 +243,151 @@ tab.2 <- tabItem(tabName= "parent_tf",
 
 tab.3 <-  tabItem(tabName = "regions",
                   class = 'active',
-                    titlePanel("Regional View"),
+                    titlePanel("Grants View"),
                     fluidRow(
-                      column(width=2,
-                             infoBoxOutput(outputId = "focal_active_grants",width = NULL),
-                             infoBoxOutput(outputId = "focal_active_funds", width = NULL),
-                             valueBoxOutput(outputId = "focal_grants_closing_3", width = NULL),
-                             valueBoxOutput(outputId = "focal_grants_active_3_zero_dis",width = NULL),
-                             valueBoxOutput(outputId = "region_grants_may_need_transfer", width = NULL),
-                             valueBoxOutput(outputId = "region_grants_active_no_transfer",width = NULL)
+                      column(width=3,
+                             valueBoxOutput(outputId = "focal_active_grants",width = 12),
+                             valueBoxOutput(outputId = "focal_active_funds", width = 12),
+                             valueBoxOutput("low_risk", width = 6),
+                             valueBoxOutput("medium_risk", width = 6),
+                             valueBoxOutput("high_risk", width = 6),
+                             valueBoxOutput("very_high_risk", width = 6),
+                        valueBoxOutput(outputId = "focal_grants_closing_3", width = 6),
+                             valueBoxOutput(outputId = "focal_grants_active_3_zero_dis",width = 6),
+                             valueBoxOutput(outputId = "region_grants_may_need_transfer", width = 6),
+                             valueBoxOutput(outputId = "region_grants_active_no_transfer",width = 6)
                              ),
-                      tabsetPanel(
-                        type = 'pills',
-                        tabPanel(
-                          title = "Overview"),
-                          fluidRow(
-                            plotlyOutput("region_remaining_committed_disbursed", height = 100)
-                          )),
-                            tabPanel(title = "Global Themes",
-                                     plotlyOutput(outputId = "region_GP_GG", width = 1200,height=500)),
-                        tabPanel(
-                          title = "Disbursement Risk",
-                          fluidRow(
-                            plotOutput(outputId = "disbursement_risk_GG"),
-                            valueBoxOutput("low_risk", width = 3),
-                            valueBoxOutput("medium_risk", width = 3),
-                            valueBoxOutput("high_risk", width = 3),
-                            valueBoxOutput("very_high_risk", width = 3),
-                            fluidRow(column(3,offset = 1,
-                                            downloadButton("generate_risk_report",
-                                           "Download Excel Report"))
+                      column(width=9,fluidRow(
+                        boxPlus(
+                          plotlyOutput("elpie2",
+                                       height="260px"),
+                          title='Funds Summary',
+                          background = "navy",
+                          enable_label = T,
+                          label_text = NULL,
+                          width = 6,
+                          collapsible = TRUE,
+                          closable = F,
+                          collapsed = F),
+                        boxPlus(
+                            plotlyOutput(outputId = "region_GP_GG",
+                                         height="260px"),
+                            title='Funding by GP/Global Theme',
+                            background = "navy",
+                            enable_label = T,
+                            label_text = NULL,
+                            width = 6,
+                            collapsible = TRUE,
+                            closable = F,
+                            collapsed = F),
+                            boxPlus(
+                              plotlyOutput(outputId = "disbursement_risk_GG", height="260px"),
+                              title='Grants Disbursement Risk',
+                              background = "navy",
+                              enable_label = T,
+                              label_text = NULL,
+                              width = 12,
+                              collapsible = TRUE,
+                              closable = F,
+                              collapsed = F),
+                            
+                        boxPlus(
+                          plotlyOutput(outputId = "focal_region_n_grants_GG",
+                                       height="260px"),
+                          title='Active Grants by Trustee',
+                          background = "navy",
+                          enable_label = T,
+                          label_text = NULL,
+                          width = 12,
+                          collapsible = TRUE,
+                          closable = F,
+                          collapsed = F)
+                             )),
+                            fluidRow(
+                              
+                      #--------        
+                            #,
+                          #    boxPlus(title='Recipient Executed Grants',
+                          #      #plotlyOutput(outputId = "RETF_trustees_R_pie",
+                          #                  # height="260px"),
+                          #      valueBoxOutput("RETF_n_grants_R"),
+                          #      valueBoxOutput("RETF_$_grants_R"),
+                          #      
+                          #      background = "blue",
+                          #      enable_label = T,
+                          #      label_text = NULL,
+                          #      width = 6,
+                          #      collapsible = TRUE,
+                          #      closable = F,
+                          #      collapsed = TRUE)
+                          # )
+                      
+                      #--------------
+                          
+                          boxPlus(solidHeader = T,
+                            DT::dataTableOutput(outputId = "region_summary_grants_table"),
+                            title='Summary Table',
+                            background = NULL,
+                            enable_label = T,
+                            label_text = NULL,
+                            width = 12,
+                            collapsible = TRUE,
+                            closable = F,
+                            collapsed = T) ,
+                          boxPlus(solidHeader = T,
+                                  DT::dataTableOutput(outputId = "region_countries_grants_table"),
+                                  title='Countries Summary Table',
+                                  background = NULL,
+                                  enable_label = T,
+                                  label_text = NULL,
+                                  width = 12,
+                                  collapsible = TRUE,
+                                  closable = F,
+                                  collapsed = T) ,
+                          boxPlus(solidHeader = T,
+                                  DT::dataTableOutput(outputId = "region_funding_source_grants_table"),
+                                  title='Funding source table',
+                                  background = NULL,
+                                  enable_label = T,
+                                  label_text = NULL,
+                                  width = 12,
+                                  collapsible = TRUE,
+                                  closable = F,
+                                  collapsed = T)
                             )
-                          )
-                        ),
-                        tabPanel(
-                          title = "Summary Table",
-                          dateInput(
-                            "summary_table_cutoff_date",
-                            "Grants that need to be implemented by:",
-                            value = grants$`Closing Date`[which.max(grants$`Closing Date`)] %>%
-                              lubridate::as_date(),
-                            autoclose = TRUE
-                          ),
-                          DT::dataTableOutput(outputId = "region_summary_grants_table"),
-                          fluidRow(column(3,offset = 1,
-                                          downloadButton("generate_full_excel_report_1",
-                                                       "Open test version excel Report"))
-                          )
-                        ),
-                        tabPanel(
-                          title = "Countries",
-                          DT::dataTableOutput(outputId = "region_countries_grants_table"),
-                          fluidRow(column(3,offset = 1,
-                                          downloadButton("generate_full_excel_report_2",
-                                                       "Open test version excel Report"))
-                          )
-                        ),
-                        tabPanel(title="Funding Sources",tabsetPanel(tabPanel(
-                          title = "Summary Plot",
-                          plotlyOutput(outputId = "focal_region_n_grants_GG", width = 1100,height=100*5)
-                        ),
-                        tabPanel(
-                          title = "Summary Table",
-                          DT::dataTableOutput(outputId = "region_funding_source_grants_table"),
-                          fluidRow(column(3,offset = 1,
-                                          downloadButton("generate_full_excel_report_3",
-                                                       "Open draft excel Report"))
-                          )
-                        ))),
-                        tabPanel(
-                          title = "RETF grants",
-                          fluidRow(
-                            valueBoxOutput("RETF_n_grants_R"),
-                            valueBoxOutput("RETF_$_grants_R")
-                          ),
-                          fluidRow(plotlyOutput("RETF_trustees_R_pie",height=470))
-                        )
-                      )
-                    )
+                      
+                      #,
+                     #fluidRow(
+                        #plotlyOutput("region_remaining_committed_disbursed", height = 100),
+                       # plotlyOutput(outputId = "region_GP_GG", width = 1200,height=500)),
+                           # ,
+                       #     fluidRow(column(3,offset = 1,
+                      #                      downloadButton("generate_risk_report",
+                      #                     "Download Excel Report"))),
+                          #dateInput(
+                          #  "summary_table_cutoff_date",
+                          #  "Grants that need to be implemented by:",
+                         #   value = grants$`Closing Date`[which.max(grants$`Closing Date`)] %>%
+                         #     lubridate::as_date(),
+                         #   autoclose = TRUE
+                        #  ),
+                         
+                      #    fluidRow(column(3,offset = 1,
+                      #                    downloadButton("generate_full_excel_report_1",
+                       #                                "Open test version excel Report"))
+                      #    )
+                       # ,
+                       #   fluidRow(column(3,offset = 1,
+                        #                  downloadButton("generate_full_excel_report_2",
+                        #                               "Open test version excel Report"))
+                        #  ),
+                        
+                          #plotlyOutput(outputId = "focal_region_n_grants_GG"),
+
+                          #fluidRow(column(3,offset = 1,
+                           #               downloadButton("generate_full_excel_report_3",
+                                               #        "Open draft excel Report"))
+                          ))
                   
 
 #tabPanel(title="RETF")
@@ -463,8 +542,16 @@ ray.of.sunshine <- rightSidebar(
       multiple = T,
       selectize = T,
       selected = unique(grants$`DF Execution Type`)
-    )
+    ),
+    selectInput(
+      "region_PMA_or_not",
+      "Select Grant Types",
+      choices = unique(grants$PMA.2),
+      multiple = T,
+      selectize = T,
+      selected = unique(grants$PMA.2)
   )
+)
 )
 
 # UI ------

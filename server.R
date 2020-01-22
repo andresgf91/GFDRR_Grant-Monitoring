@@ -29,6 +29,104 @@ server <- shinyServer(function(input,output,session) {
                                                                 "style=\"padding:2px; font-size:80%\">Show</button>")
   ) 
   }
+  
+  
+  
+  # Interactive Rigth Side-Bar 
+  
+  
+  
+  observe({
+    if (req(input$nav) == "parent_tf"){
+      shinyjs::removeClass(selector = "body", class = "control-sidebar-open")
+      output$side_bar <- renderUI({
+        
+        rightSidebarTabContent(
+          title="Edit View",
+          id= 1,
+          icon="desktop",
+          active=TRUE,
+          selectInput('select_trustee',"Selected trustee:",
+                      choices = sort(unique(active_trustee$temp.name[active_trustee$`Net Signed Condribution in USD`>0])),
+                      selected = active_trustee$temp.name[active_trustee$`Net Signed Condribution in USD`>0][1]),
+          selectInput('trustee_select_region',"Selected Regions:",
+                      choices = sort(unique(grants$temp.name)),
+                      multiple = TRUE,
+                      #selectize = TRUE,
+                      selected =  sort(unique(grants$temp.name)))
+        )
+        
+      })
+    }
+    if (req(input$nav) == "regions"){
+      shinyjs::addClass(selector = "aside.control-sidebar", class = "control-sidebar-open")
+      shinyjs::removeClass(selector = "aside.control-sidebar", class = "control-sidebar-open")
+      output$side_bar <- renderUI({
+        rightSidebarTabContent(title = "Edit View",
+          id = 2,icon="gears",
+          selectInput(
+            'focal_select_region',
+            "Selected region(s):",
+            choices = sort(unique(grants$Region)),
+            multiple = TRUE,
+            selectize = TRUE,
+            selected = sort(unique(grants$Region))
+          ),
+          selectInput(
+            'focal_select_trustee',
+            "Selected trustee(s)",
+            choices = c("All" = "", sort(unique(grants$temp.name))),
+            multiple = TRUE,
+            selectize = TRUE,
+            selected = unique(grants$temp.name),
+            width = NULL
+          ),
+          selectInput(
+            "region_BE_RE",
+            "Selected grant exc. types:",
+            choices = unique(grants$`DF Execution Type`),
+            multiple = T,
+            selectize = T,
+            selected = unique(grants$`DF Execution Type`)
+          ),
+          selectInput(
+            "region_PMA_or_not",
+            "Selected grant types:",
+            choices = unique(grants$PMA.2),
+            multiple = T,
+            selectize = T,
+            selected = unique(grants$PMA.2)
+          ),
+          selectInput(
+            "closing_fy",
+            "Closing in fiscal year(s):",
+            choices = sort(unique(grants$closing_FY)),
+            multiple = T,
+            selectize = T,
+            selected = sort(unique(grants$closing_FY))
+          )
+          )
+      })
+    }
+    if (req(input$nav) == "overview"){
+      shinyjs::removeClass(selector = "aside.control-sidebar", class = "control-sidebar-open")
+      
+      output$side_bar <- renderUI({ div() })
+    }
+    if (req(input$nav) == "admin_info"){
+      shinyjs::removeClass(selector = "aside.control-sidebar", class = "control-sidebar-open")
+      
+      output$side_bar <- renderUI({ div() })
+    }
+    
+    
+  })
+  
+  
+  
+  
+  
+  
 
    message_df <- data.frame()
 # TAB.1 -------------------------------------------------------------------
@@ -722,13 +820,27 @@ server <- shinyServer(function(input,output,session) {
       })
       
       
+      observe({ if (req(input$nav) == "parent_tf")  {
+        #subset the data by trustee selected
+        temp_grants <- grants %>% filter(temp.name == input$select_trustee)
+        
+        updateSelectInput(session, "trustee_select_region",
+                          label = 'Selected Regions',
+                          choices = sort(unique(temp_grants$Region)),
+                          selected = unique(temp_grants$Region))
+      }
+      })
+        output$trustee_contribution_agency <- renderText({
+          temp_active_trustee$`Donor Agency Name`
+        })
+      
       output$TTL_name <- renderText({
         
-        temp_active_trustee$`Fund TTL Name`[1]
+        paste0("TTL: ",temp_active_trustee$`Fund TTL Name`[1])
       })
       
       output$trustee_name <- renderText({
-        temp_active_trustee$`Fund Name`
+        temp_active_trustee$temp.name
       })
     })
   
@@ -736,34 +848,54 @@ server <- shinyServer(function(input,output,session) {
         
         temp_active_trustee <- reactive_active_trustee()
         sum(temp_active_trustee$`Net Signed Condribution in USD`) %>% dollar %>% 
-          valueBox(subtitle = "Fund Size",value=.)
+          valueBox(subtitle = "Fund Size",value=tags$p(., style = "font-size: 85%;"),color = "blue",icon = icon("money-check-alt"))
       })
       
-      output$trustee_received <- renderValueBox({
-        temp_active_trustee <- reactive_active_trustee()
-        received <- sum(temp_active_trustee$`Net Paid-In Condribution in USD`) %>% dollar
+      
+      output$trustee_received_unpaid_pie <- renderPlotly({
         
-        percent <- round(sum(temp_active_trustee$`Net Paid-In Condribution in USD`)*100/
-          sum(temp_active_trustee$`Net Signed Condribution in USD`),digits = 1)
+        temp_df <- reactive_active_trustee()
+        temp_df <- temp_df %>% 
+          summarise("Paid-In" = round(sum(`Net Paid-In Condribution in USD`)),
+                    "Unpaid" = round(sum(`Net Unpaid contribution in USD`))) %>%
+          reshape2::melt()
         
-        display <- paste0(received," (",percent,"%)")
-          valueBox(subtitle="Funds received to date by Donor",value= display)
+        temp_df$percentage <- temp_df$value/sum(temp_df$value)
+        
+        total <- sum(temp_df$value)
+        
+        m <- list(
+          l = 15,
+          r = 5,
+          b = 10,
+          t = 15,
+          pad = 4
+        )
+        
+        colors <- c('rgb(17,71,250)',#,'rgb(192,192,192)',
+                    'rgb(192,207,255)')
+        
+        plot_ly() %>%
+          add_pie(
+            data = temp_df,
+            title="Contributions",
+            labels=~variable,
+            values = ~value,
+            textinfo= 'text',
+            text=  ~paste0(dollar(value),"\n",percent(percentage)),
+            hoverinfo="label+text",
+            marker = list(colors=colors),
+            hole = 0.75,
+            rotation=75,
+            showpercent=F) %>% 
+          layout(xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+                 yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+                 margin=m,
+                 legend = list(orientation = 'h',font = list(size = 9), x=0.25, y=-0.01),textformat="$,f")
       })
       
-      output$trustee_unpaid <- renderValueBox({
-        
-        temp_active_trustee <- reactive_active_trustee()
-        unpaid <- sum(temp_active_trustee$`Net Unpaid contribution in USD`) %>% dollar
-         
-        
-        percent <- round(sum(temp_active_trustee$`Net Unpaid contribution in USD`)*100/
-                             sum(temp_active_trustee$`Net Signed Condribution in USD`),digits = 1)
-          
-        display <- paste0(unpaid," (",percent,"%)")
-        
-        valueBox(subtitle = "Unpaid Contribution Amount",value=display)
-      })
-    
+      
+
       output$trustee_grants_amounts <- renderValueBox({
         
         temp_grants <- reactive_grants_trustee()
@@ -772,59 +904,59 @@ server <- shinyServer(function(input,output,session) {
       })
       
       output$trustee_dis_GG <- renderPlotly({
-      
-        temp_df <- reactive_grants_trustee()
+    
+          
+          temp_df <- reactive_grants_trustee()
+          temp_df <- temp_df %>% 
+            summarise(Disbursed = sum(`Disbursements USD`),
+                      Committed = sum(`Commitments USD`),
+                      Uncommitted = sum(unnacounted_amount)) %>%
+            reshape2::melt()
+          
+          temp_df$percentage <- temp_df$value/sum(temp_df$value)
+          
+          total <- sum(temp_df$value)
+          
+          m <- list(
+            l = 15,
+            r = 5,
+            b = 5,
+            t = 15,
+            pad = 4
+          )
+          
+          colors <- c('rgb(17,71,250)',
+                      'rgb(192,207,255)',
+                      'rgb(192,192,192)')
+          
+          plot_ly() %>%
+            add_pie(
+              data = temp_df,
+              title="Active Funds",
+              labels=~variable,
+              values = ~value,
+              textinfo= 'percent',
+              text=  ~paste0(dollar(value),"\n",percent(percentage)),
+              hoverinfo="label+text",
+              marker = list(colors=colors),
+              hole = 0.75,
+              rotation=75,
+              showpercent=F) %>% 
+            layout(xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+                   yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+                   margin=m,
+                   legend = list(orientation = 'h',font = list(size = 9), x=0.1, y=-0.1))
+        })
         
-        new_df <- data.frame(Disbursed=sum(temp_df$`Disbursements USD`),
-                             Committed=sum(temp_df$`Commitments USD`),
-                             "Available Balance"=sum(temp_df$unnacounted_amount)) %>% 
-          reshape2::melt() %>%
-          mutate(total=sum(temp_df$`Grant Amount USD`)) %>%
-          mutate(percent=value/total)
         
-        gg <- new_df %>% ggplot(aes(x=total,
-                                    y=value,
-                                    fill=variable,
-                                    label=percent(percent),
-                                    text=paste(variable,"\n",
-                                               "USD Amount:",dollar(value),"\n",
-                                               "Percentage of Total:",percent(percent)))) +
-          geom_bar(stat='identity',position = 'stack') +
-          # coord_flip() +
-          theme_minimal() +
-          labs(y="USD Amount")+
-          theme(axis.title.y = element_blank(),
-                axis.text.y = element_blank(),
-                axis.ticks.y = element_blank(),
-                panel.background = element_blank(),
-                panel.grid = element_blank(),
-                axis.text.x = element_blank(),
-                axis.ticks.x = element_blank()) +
-          theme(#legend.direction = "horizontal",
-            legend.position = 'bottom',
-            legend.title = element_blank(),
-            axis.title.x = element_blank(),
-            plot.margin = unit(c(0,0,0,0), "cm")) +
-          coord_flip() +
-          scale_fill_discrete(breaks=c("Available Balance","Committed","Disbursed")) +
-          scale_fill_brewer(palette = "Blues") +
-          geom_text(size = 3, position = position_stack(vjust = 0.5),) 
-        
-        plotly::ggplotly(gg, tooltip = "text") %>%
-          layout(legend = list(orientation = 'h',
-                               font = list(size = 10),
-                               x=.2, y = -4,
-                               traceorder="reversed"))
-        
-        
-      })
     
       output$trustee_active_grants <- renderValueBox({
         temp_grants <- reactive_grants_trustee()
         temp_grants %>% select(Fund)%>% dplyr::distinct() %>% nrow() %>% 
-          valueBox(subtitle = HTML("<b>Number of Active Grants</b> <button id=\"show_active_grants_trustee\" type=\"button\" class=\"btn btn-default action-button\">Show Grants</button>"),
+          valueBox(subtitle = show_grant_button("Active grants ",
+                                                "show_active_grants_trustee"),
                    value=.,
-                   width=NULL)
+                   color = "light-blue")
       })
       
       observeEvent(input$show_active_grants_trustee, {
@@ -850,23 +982,23 @@ server <- shinyServer(function(input,output,session) {
         
       })
       
-      output$trustee_grants_closing_6 <- renderValueBox({
+      output$trustee_grants_closing_3 <- renderValueBox({
         
         temp_grants <- reactive_grants_trustee()
         temp_grants %>%
-          filter(months_to_end_disbursement <= 6) %>% nrow() %>% 
-          valueBox(subtitle = HTML("<b>Grants closing in less than 6 months</b> <button id=\"show_grants_closing_6\" type=\"button\" class=\"btn btn-default action-button\">Show Grants</button>"),
-                                   value=.,
-                                   width=NULL,
-                   color = 'orange')
+          filter(months_to_end_disbursement <= 3) %>% nrow() %>% 
+          valueBox(subtitle = show_grant_button("Grants closing in less than 6 months",
+                                                "show_grants_closing_3"),
+                   value=.,
+                   color = 'light-blue')
         
       })
       
-      observeEvent(input$show_grants_closing_6, {
+      observeEvent(input$show_grants_closing_3, {
         temp_grants <- reactive_grants_trustee()
         
         isolate(data <- temp_grants %>% filter(`Fund Status` == "ACTV", `Grant Amount USD` != 0) %>%
-                  filter(months_to_end_disbursement <= 6) %>%
+                  filter(months_to_end_disbursement <= 3) %>%
                   select(Fund,
                          `Fund Name`,
                          `Fund TTL Name`,
@@ -891,7 +1023,10 @@ server <- shinyServer(function(input,output,session) {
       output$trustee_closing_in_months <- renderValueBox({
         temp_active_trustee <- reactive_active_trustee()
         temp_active_trustee$months_to_end_disbursement %>% 
-          valueBox(subtitle = "Months until fund closing date:",value=.,icon = icon("stopwatch"))
+          valueBox(subtitle = "Months to fund closing date:",
+                   value=.,
+                   icon = icon("stopwatch"),
+                   color = "blue")
       })
       
       output$trustee_region_n_grants_GG <- renderPlotly({
@@ -910,12 +1045,17 @@ server <- shinyServer(function(input,output,session) {
                                 dollar(total_award_amount)))) +
           geom_col(fill='royalblue') +
           theme_classic() +
-          labs(x="Region", y="Number of Grants")+
-          theme(rect = element_rect(fill="transparent"),
-                plot.background = element_rect(fill="transparent",color=NA),
-                panel.background = element_rect(fill="transparent")) 
+          labs(x="Region", y="Number of Grants")
         
-        plotly::ggplotly(gg, tooltip = "text")
+        m <- list(
+          l = 15,
+          r = 5,
+          b = 5,
+          t = 5,
+          pad = 4
+        )
+        
+        plotly::ggplotly(gg, tooltip = "text") %>% layout(margin=m)
         
       })
       
@@ -938,28 +1078,38 @@ server <- shinyServer(function(input,output,session) {
                                 "Total Available Balance:",dollar(total_remaining_balance)))) +
           geom_col(fill='royalblue') +
           theme_classic() +
-          labs(x="Region", y="Total USD amount in active grants")+
-          theme(rect = element_rect(fill="transparent"),
-                plot.background = element_rect(fill="transparent",color=NA),
-                panel.background = element_rect(fill="transparent")) +
+          labs(x="Region", y="Funds in active grants") +
           scale_y_continuous(labels=dollar_format(prefix="$"))
         
-        plotly::ggplotly(gg, tooltip = "text")
+        m <- list(
+          l = 15,
+          r = 5,
+          b = 5,
+          t = 5,
+          pad = 4
+        )
+        
+        plotly::ggplotly(gg, tooltip = "text") %>% layout(margin=m)
         
       })
       
-      output$trustee_countries_DT <- DT::renderDataTable({
+      output$trustee_countries_DT <- renderDataTable({
         
         temp_df <- reactive_grants_trustee()
         temp_df <- temp_df %>%
           group_by(Country) %>%
-          summarise("Number of Active Grants" = n(),
-                    "Total Active Grants Amount" = dollar(sum(`Grant Amount USD`)),
-                    "Percent Available" = percent((sum(unnacounted_amount))/sum(`Grant Amount USD`),accuracy=1),
-                    "Avg. Monthly Disbursement Rate" = percent(mean(monthly_disbursement_rate),accuracy = 1))
+          summarise("Grant Count" = n(),
+                    "Total Grant Amount" = dollar(sum(`Grant Amount USD`)),
+                    "Uncommitted Amount" = dollar(sum(unnacounted_amount)),
+                    "Percent Uncommitted" = percent((sum(unnacounted_amount))/sum(`Grant Amount USD`),accuracy=1)
+                    )
+        
+        
+    
         
         DT::datatable(temp_df,options = list(
-          "pageLength" = 15))
+          "pageLength" = 10))
+       
       })
     
 # TAB.3 REGIONS VIEW -------------------------------------------------------------------

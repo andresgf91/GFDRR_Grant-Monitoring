@@ -27,6 +27,7 @@ library(plotly)
 library(streamgraph)
 library(DT)
 library(shinythemes)
+library(shinyjs)
 
 source("data_import.R")
 source('Data_processing.R')
@@ -36,33 +37,36 @@ source("Plots.R")
 # BUILD USER INTERFACE ----------------------------------------------------
 
 ## Header ---------------
-header <- dashboardHeaderPlus(
-                          dropdownMenuOutput("date_data_updated_message"),
-                          disable = F,
+Header <- dashboardHeaderPlus(
+                          #dropdownMenuOutput("date_data_updated_message"),
+                         # disable = F,
                           enable_rightsidebar = TRUE,
-                          rightSidebarIcon = "sliders-h"
+                          rightSidebarIcon = "gears"
 )
 ## Sidebar ---------------
 
     
-secretariat_view <-    menuItem("Secretariat View",icon = icon("dashboard"),
-                       menuSubItem("Overview",
+secretariat_view <-   # menuItem("Secretariat View",icon = icon("dashboard"),
+                       menuItem("General Overview",
                                 tabName = "overview",
-                                icon = icon("dashboard")),
-                       #menuSubItem("PMA",
+                                icon = icon("dashboard"),
+                                selected = F)
+                       #,
+info <-             #menuSubItem("PMA",
                               #  tabName = "PMA",
                               #  icon = icon("stream")),
-                       menuSubItem("Other Info",
-                                tabName = "admin_info",
-                                icon = icon("stream")))
+                    menuItem("Additional Info",
+                             tabName = "admin_info",
+                             icon = icon("info"))
 
 parent_trust_fund_view <-   menuItem("Parent Trust Fund",
                        tabName = "parent_tf",
-                       icon = icon("stream"))
+                       icon = icon("funnel-dollar"),
+                       selected = T)
 
-regions_view <-  menuItem("Regions",
+regions_view <-  menuItem("Grants Costum View",
                        tabName = "regions",
-                       icon = icon("receipt"),selected = TRUE)
+                       icon = icon("search-plus"),selected = F)
 
 TTL_grant_detail <-  menuItem("TTL/Grant Detail",
                        menuSubItem("Grant View",
@@ -73,11 +77,13 @@ TTL_grant_detail <-  menuItem("TTL/Grant Detail",
                                    icon = icon("stream")))
 
 
-sidebar <- dashboardSidebar(collapsed = TRUE,
-                            sidebarMenu(regions_view,
-                                        secretariat_view,
+Sidebar <- dashboardSidebar(#collapsed = TRUE,
+                            sidebarMenu( secretariat_view,
+                                         regions_view,
                                         parent_trust_fund_view,
-                                        TTL_grant_detail))
+                                        info,
+                                       # TTL_grant_detail,
+                                        id = 'nav'))
 
 ## tab.1 (Overview)---------------
 tab.1 <-  tabItem(tabName = "overview",
@@ -192,51 +198,85 @@ tab.1.3 <-  tabItem(tabName = "admin_info",
 
 ## tab.2 (Parent Trustfund View) ----------------------
 tab.2 <- tabItem(tabName= "parent_tf",
-                 wellPanel("Parent Trust Fund View"),
+                 titlePanel("Parent Trust Fund View"),
                            fluidRow(
                    column(width=3,
-                 box(title="Contribution by:",
-                     textOutput('trustee_contribution_agency'),
-                     width=NULL
-                     )),
-                 column(width=5,
-                 box(title = 'Trustee Fund Name',
+                 boxPlus(
                      textOutput('trustee_name'),
-                     width = NULL),
-                 box(title = 'TTL Name',
+                     width=NULL,background = "navy")),
+                 column(width=9,
+                 boxPlus(
+                     textOutput('trustee_contribution_agency'),
+                     width = 6,background = 'navy'),
+                 boxPlus(
                      textOutput('TTL_name'),
-                     width = NULL)),
-                 column(width=4,
-                        wellPanel(
-                          selectInput('trustee_select_region',"Selected Regions",
-                                      choices = sort(unique(grants$temp.name)),
-                                      multiple = TRUE,
-                                      selectize = TRUE,
-                                      selected =  sort(unique(grants$temp.name)))))),
+                     width = 6,
+                     background = "navy"))),
                  fluidRow(
-                   tabsetPanel(
-                     tabPanel(title="Overview",
-                              fluidRow(
-                       column(width=4,
-                              valueBoxOutput("fund_contributions",width = NULL),
-                              valueBoxOutput("trustee_closing_in_months",width = NULL)),
-                       column(width=4,
-                              valueBoxOutput("trustee_received",width = NULL),
-                              valueBoxOutput("trustee_unpaid",width = NULL)),
+                   column(width=3,
+                 valueBoxOutput("fund_contributions",width = NULL),
+                 valueBoxOutput("trustee_closing_in_months",width = NULL),
+                 valueBoxOutput("trustee_active_grants",width = NULL),
+                 valueBoxOutput("trustee_grants_closing_3",width = NULL)
+                           ),
+                 column(width=9,
+                        boxPlus(
+                          plotlyOutput("trustee_received_unpaid_pie", height = 260),
+                          title='Contributions',
+                          background = "blue",
+                          enable_label = T,
+                          label_text = NULL,
+                          width = 6,
+                          collapsible = TRUE,
+                          closable = F),
+                        boxPlus(
+                          plotlyOutput("trustee_dis_GG", height = 260),
+                          title='Disbursement Summary',
+                          background = "blue",
+                          enable_label = T,
+                          label_text = NULL,
+                          width = 6,
+                          collapsible = TRUE,
+                          closable = F),
+                        boxPlus(
+                          plotlyOutput("trustee_region_n_grants_GG", height = 260),
+                          title='Grants by Region',
+                          background = "blue",
+                          enable_label = T,
+                          label_text = NULL,
+                          width = 6,
+                          collapsible = TRUE,
+                          closable = F),
+                        boxPlus(
+                          plotlyOutput("trustee_region_GG", height = 260),
+                          title='Funding per Region',
+                          background = "blue",
+                          enable_label = T,
+                          label_text = NULL,
+                          width = 6,
+                          collapsible = TRUE,
+                          closable = F))),
+                 fluidRow(
+                 boxPlus(boxPlus(solidHeader = T,
+                   dataTableOutput("trustee_countries_DT"),
+                   title='Country Summary Table',
+                   background = NULL,
+                   enable_label = T,
+                   label_text = NULL,
+                   width = NULL,
+                   collapsible = TRUE,
+                   closable = F,
+                   collapsed = T),background = 'blue',width = 12
+                 )
+                 )
+)
+                        
+                        
+                        
+                              #valueBoxOutput("trustee_received",width = NULL),
+                             # valueBoxOutput("trustee_unpaid",width = NULL)),
                               #infoBoxOutput("trustee_grants_amounts",width = NULL)),
-                       column(width=4,
-                              valueBoxOutput("trustee_active_grants",width = NULL),
-                              valueBoxOutput("trustee_grants_closing_6",width = NULL))),
-                       fluidRow(
-                         plotlyOutput("trustee_dis_GG",height = 100))),
-                     tabPanel(
-                   title="Grants per Region",
-                   plotlyOutput(outputId = "trustee_region_n_grants_GG",width = 1000, height=300)),
-                   tabPanel(
-                     title="Funding per Region",
-                     plotlyOutput(outputId = "trustee_region_GG",width = 1000,height = 300)),
-                   tabPanel(title="List of Countries",
-                            dataTableOutput("trustee_countries_DT")))))
+  
 
 
 ## tab.3 (Regions View) ---------------
@@ -304,25 +344,6 @@ tab.3 <-  tabItem(tabName = "regions",
                           collapsed = F)
                              )),
                             fluidRow(
-                              
-                      #--------        
-                            #,
-                          #    boxPlus(title='Recipient Executed Grants',
-                          #      #plotlyOutput(outputId = "RETF_trustees_R_pie",
-                          #                  # height="260px"),
-                          #      valueBoxOutput("RETF_n_grants_R"),
-                          #      valueBoxOutput("RETF_$_grants_R"),
-                          #      
-                          #      background = "blue",
-                          #      enable_label = T,
-                          #      label_text = NULL,
-                          #      width = 6,
-                          #      collapsible = TRUE,
-                          #      closable = F,
-                          #      collapsed = TRUE)
-                          # )
-                      
-                      #--------------
                           
                           boxPlus(solidHeader = T,
                             DT::dataTableOutput(outputId = "region_summary_grants_table"),
@@ -355,7 +376,7 @@ tab.3 <-  tabItem(tabName = "regions",
                                   closable = F,
                                   collapsed = T)
                             )
-                      
+                            
                       #,
                      #fluidRow(
                         #plotlyOutput("region_remaining_committed_disbursed", height = 100),
@@ -412,7 +433,6 @@ PMA.tab <- tabItem(tabName = "PMA",
                      streamgraphOutput(outputId = "streamgraph",
                                        height="350px",
                                        width="800px")))))
-
 
 
 
@@ -489,7 +509,7 @@ tab.6 <- tabItem(
   )
 
 ## BODY ---------------
-body <- dashboardBody(tags$head(tags$style(HTML('
+Body <- dashboardBody(tags$head(tags$style(HTML('
   .navbar-custom-menu>.navbar-nav>li>.dropdown-menu {
   width:600px;
   }
@@ -503,7 +523,8 @@ body <- dashboardBody(tags$head(tags$style(HTML('
     .wrapper{
     overflow-y: hidden;}
 
-  '))),tabItems(tab.1,tab.2,tab.3,PMA.tab,tab.1.3,tab.5,tab.6))
+  '))),tabItems(tab.1,tab.3,tab.2,tab.1.3))
+                #tab.2,tab.3,PMA.tab,tab.1.3,tab.5,tab.6))
 
 # RAY OF SUNSHINE --------------
 ray.of.sunshine <- rightSidebar(
@@ -555,8 +576,15 @@ ray.of.sunshine <- rightSidebar(
 )
 
 # UI ------
-ui <- dashboardPagePlus(collapse_sidebar = TRUE,header,sidebar,body,
-                        rightsidebar = ray.of.sunshine,
+ui <- dashboardPagePlus(collapse_sidebar = TRUE,
+                        useShinyjs(),
+                        header = Header,
+                        sidebar = Sidebar,
+                        body = Body,
+                        rightsidebar =  rightSidebar(
+                          background = "dark",
+                          uiOutput("side_bar"),
+                          title = "Right Sidebar"),
                         skin = "black")
 
 

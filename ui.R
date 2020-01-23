@@ -50,7 +50,7 @@ secretariat_view <-   # menuItem("Secretariat View",icon = icon("dashboard"),
                        menuItem("General Overview",
                                 tabName = "overview",
                                 icon = icon("dashboard"),
-                                selected = F)
+                                selected = T)
                        #,
 info <-             #menuSubItem("PMA",
                               #  tabName = "PMA",
@@ -62,7 +62,7 @@ info <-             #menuSubItem("PMA",
 parent_trust_fund_view <-   menuItem("Parent Trust Fund",
                        tabName = "parent_tf",
                        icon = icon("funnel-dollar"),
-                       selected = T)
+                       selected = F)
 
 regions_view <-  menuItem("Grants Costum View",
                        tabName = "regions",
@@ -76,12 +76,18 @@ TTL_grant_detail <-  menuItem("TTL/Grant Detail",
                                    tabName = "TTL_dashboard",
                                    icon = icon("stream")))
 
+reports_tab <- menuItem("Download Reports",
+                        tabName = "reports",
+                        icon=icon("file-download"),
+                        selected = F)
+
 
 Sidebar <- dashboardSidebar(#collapsed = TRUE,
                             sidebarMenu( secretariat_view,
                                          regions_view,
                                         parent_trust_fund_view,
                                         info,
+                                        reports_tab,
                                        # TTL_grant_detail,
                                         id = 'nav'))
 
@@ -141,7 +147,7 @@ tab.1 <-  tabItem(tabName = "overview",
                                 collapsible = TRUE,
                                 closable = F),
                         boxPlus(
-                          plotlyOutput("plot1",height = "260px"),
+                          plotlyOutput("plot1",height = "600px"),
                                 title="Contributions by Trustee",
                                 width = NULL,
                           background = "blue",
@@ -257,8 +263,7 @@ tab.2 <- tabItem(tabName= "parent_tf",
                           collapsible = TRUE,
                           closable = F))),
                  fluidRow(
-                 boxPlus(boxPlus(solidHeader = T,
-                   dataTableOutput("trustee_countries_DT"),
+                   boxPlus(dataTableOutput("trustee_countries_DT"),
                    title='Country Summary Table',
                    background = NULL,
                    enable_label = T,
@@ -266,8 +271,8 @@ tab.2 <- tabItem(tabName= "parent_tf",
                    width = NULL,
                    collapsible = TRUE,
                    closable = F,
-                   collapsed = T),background = 'blue',width = 12
-                 )
+                   collapsed = T)
+                 
                  )
 )
                         
@@ -508,6 +513,78 @@ tab.6 <- tabItem(
     )
   )
 
+
+# Tab 7. Reports Download Tab --------
+
+tab.reports <- tabItem(
+  tabName = 'reports',
+  h1("Download Reports"),
+  
+  fluidRow(
+    column(width=3,
+           selectInput(inputId = "report_type",label=NULL,
+                       choices= c("Summary Report",
+                                  "Disbursement Risk Report",
+                                  "Sameh Report"),
+                       selectize=TRUE)),
+    column(width=4,
+           conditionalPanel(
+             condition = "input.report_type == 'Summary Report'",
+             boxPad(color = 'blue',
+                    selectInput(inputId = "summary_fund_status",width = NULL,
+                                label="Child Fund Status:",
+                                choices= c("ACTV","PEND"),
+                                multiple = T,
+                                selectize = T,
+                                selected =  c("ACTV","PEND")),
+                    selectInput(inputId = "summary_region",
+                                label="Region Name(s):",
+                                choices= sort(unique(grants$Region)),
+                                multiple = T,
+                                selectize = T,
+                                selected =  sort(unique(grants$Region))),
+                    selectInput(inputId = "summary_trustee",
+                                label="Trustee(s):",
+                                choices= sort(unique(grants$temp.name)),
+                                multiple = T,
+                                selectize = T,
+                                selected =  sort(unique(grants$temp.name)))
+             )
+           ),
+           conditionalPanel(
+             condition = "input.report_type == 'Disbursement Risk Report'",
+             boxPad(color = 'blue',
+                    selectInput(inputId = "risk_fund_status",width = NULL,
+                                label="Child Fund Status:",
+                                choices= c("ACTV","PEND"),
+                                multiple = T,
+                                selectize = T,
+                                selected =  c("ACTV","PEND")),
+                    selectInput(inputId = "risk_region",
+                                label="Region Name(s):",
+                                choices= c("ALL",sort(unique(grants$Region))),
+                                multiple = F,
+                                selectize = T,
+                                selected =  "ALL"),
+                    selectInput(inputId = "risk_trustee",
+                                label="Trustee(s):",
+                                choices= sort(unique(grants$temp.name)),
+                                multiple = T,
+                                selectize = T,
+                                selected =  sort(unique(grants$temp.name)))
+             )
+           )
+    ),
+    conditionalPanel(condition = "input.report_type == 'Summary Report'",
+                     downloadButton("Download_summary_report.xlsx",
+                                    label = 'Download Report')),
+    conditionalPanel(condition = "input.report_type == 'Disbursement Risk Report'",
+                     downloadButton("Download_risk_report.xlsx",
+                                    label = 'Download Report'))
+  )
+)
+
+
 ## BODY ---------------
 Body <- dashboardBody(tags$head(tags$style(HTML('
   .navbar-custom-menu>.navbar-nav>li>.dropdown-menu {
@@ -523,7 +600,7 @@ Body <- dashboardBody(tags$head(tags$style(HTML('
     .wrapper{
     overflow-y: hidden;}
 
-  '))),tabItems(tab.1,tab.3,tab.2,tab.1.3))
+  '))),tabItems(tab.1,tab.3,tab.2,tab.1.3,tab.reports))
                 #tab.2,tab.3,PMA.tab,tab.1.3,tab.5,tab.6))
 
 # RAY OF SUNSHINE --------------

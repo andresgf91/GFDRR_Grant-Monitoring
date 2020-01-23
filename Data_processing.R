@@ -14,7 +14,7 @@ grants_file <- "GFDRR Dashboard grant level 12_3_19.xlsx"
 sap <- read_xlsx('SAP Data as of June 30_2019.xlsx')
 grants <- read_xlsx(grants_file)
 date_data_udpated <- lubridate::mdy(stri_sub(grants_file,from = -13,-6))
-
+report_data_date <- "January 13, 2020"
 #dash <- read_xlsx('GFDRR Dashboard - 201910.xlsx', sheet = 3, skip = 2)
 #trustee <- read_xls('GFDRR_mg_unit.xls', skip=2)
 trustee <- read_xlsx('GFDRR Trustee level 12_2_19.xlsx')

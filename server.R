@@ -407,7 +407,7 @@ server <- shinyServer(function(input,output,session) {
       sum(temp_grants$unnacounted_amount) %>% 
         dollar()%>% 
         valueBox(
-          "Available Balance", ., icon = icon("receipt"),
+          "Uncommited Balance", ., icon = icon("receipt"),
           color = "green", subtitle = "*operational grants")
     })
     
@@ -1073,9 +1073,9 @@ server <- shinyServer(function(input,output,session) {
                                 "Number of Grants:",
                                 n_grants,
                                 "\n",
-                                "Total Active Awards Amount:",
+                                "Active Grants Amount:",
                                 dollar(total_award_amount),"\n",
-                                "Total Available Balance:",dollar(total_remaining_balance)))) +
+                                "Uncommitted Balance:",dollar(total_remaining_balance)))) +
           geom_col(fill='royalblue') +
           theme_classic() +
           labs(x="Region", y="Funds in active grants") +
@@ -2991,7 +2991,460 @@ server <- shinyServer(function(input,output,session) {
           })
         })
 
+  
+        #-----------DOWNLOAD SUMMARY REPORT----------      
+        output$Download_summary_report.xlsx <- downloadHandler(
+          filename = function() {
+            paste("Summary Report",".xlsx", sep="")},
+          content = function(file) {
+            openxlsx::saveWorkbook({
+              
+              
+              #CODE---------------
+              report_grants <- read_xlsx('GFDRR Raw Data 1_13_20.xlsx',2)
+              report_data_date <- "January 13 2020"
+              
+              recode_GT <- read_xlsx("Global Theme - Resp. Unit Mapping.xlsx")
+              
+              SR_grant_details <- read_xlsx("Trust_Fund_Breakdown_Table_TF4.1 Grant Details Report.xlsx",skip=3)
+              
+              recode_trustee.2 <- read_xlsx("GFDRR Trustee Names.xlsx")
+              
+              
+              report_grants <- left_join(report_grants,recode_trustee.2,by = c("Trustee"="Trustee"))
+              
+              report_grants <- report_grants %>%
+                filter(`Child Fund Status` %in% input$summary_fund_status,
+                       `Region Name` %in% input$summary_region,
+                       `Trustee Fund Name` %in% input$summary_trustee
+                )
+              
+              temp_df <-  report_grants %>%
+                filter(!is.na(`Lead GP/Global Themes`)) %>% 
+                mutate(GPURL_binary = ifelse(
+                  `Lead GP/Global Themes`=="Urban, Resilience and Land",
+                  "GPURL",
+                  "Non-GPURL")) 
+              
+              
+              temp_df$unnacounted_amount <- temp_df$`Grant Amount` -
+                (temp_df$`Cumulative Disbursements` + temp_df$`PO Commitments`)
+              
+              sum_df_all <- temp_df %>%
+                summarise("# Grants" = n(),
+                          "$ Amount" = sum(`Grant Amount`),
+                          "Balance" = sum(unnacounted_amount)) %>%
+                mutate("percent" = Balance/`$ Amount`)
+              
+              sum_df_GPURL <-  temp_df %>%
+                filter(GPURL_binary=="GPURL") %>% 
+                summarise("# Grants" = n(),
+                          "$ Amount" = sum(`Grant Amount`),
+                          "Balance" = sum(unnacounted_amount))%>%
+                mutate("percent"= Balance/`$ Amount`)
+              
+              sum_df_non_GPURL <- temp_df %>%
+                filter(GPURL_binary=="Non-GPURL") %>% 
+                summarise("# Grants" = n(),
+                          "$ Amount" = sum(`Grant Amount`),
+                          "Balance" = sum(unnacounted_amount))%>%
+                mutate("percent"= Balance/`$ Amount`) 
+              
+              
+              sum_display_df <- data.frame("Summary"= c("Grant Count",
+                                                        "Total $ (Million)",
+                                                        "Total Uncommitted Balance ($)",
+                                                        "% Uncommitted Balance ($)"),
+                                           "GPURL"=unname(unlist(as.list(sum_df_GPURL))),
+                                           "Non-GPURL"=unname(unlist(as.list(sum_df_non_GPURL))),
+                                           "Combined Total"=unname(unlist(as.list(sum_df_all))))
+              
+              names(sum_display_df) <- c("Summary","GPURL","Non-GPURL"," Combined Total")
+              
+              
+              #---------COUNTRIES DF ----------------------
+              temp_df_all <- temp_df %>%
+                group_by(Country) %>%
+                summarise("# Grants" = n(),
+                          "$ Amount" = (sum(`Grant Amount`)),
+                          "Balance" = (sum(unnacounted_amount)))
+              
+              temp_df_GPURL <- temp_df %>%
+                filter(GPURL_binary=="GPURL") %>% 
+                group_by(Country) %>%
+                summarise("# Grants" = n(),
+                          "$ Amount" = (sum(`Grant Amount`)),
+                          "Balance" = (sum(unnacounted_amount)))
+              
+              temp_df_non_GPURL <- temp_df %>% filter(GPURL_binary=="Non-GPURL") %>% 
+                group_by(Country) %>%
+                summarise("# Grants" = n(),
+                          "$ Amount" = (sum(`Grant Amount`)),
+                          "Balance" = (sum(unnacounted_amount)))
+              
+              
+              display_df_partial <- full_join(temp_df_GPURL,
+                                              temp_df_non_GPURL,
+                                              by="Country",
+                                              suffix=c(" (GPURL)"," (Non-GPURL)"))
+              
+              
+              display_df <- left_join(temp_df_all,display_df_partial,by="Country")
+              
+              display_df <- display_df %>%  rename("Country/Region"=Country)
+              
+              
+              #---------FUNDING SOURCE DF ----------------------
+              
+              temp_df_all <- temp_df %>%
+                group_by(`Trustee Fund Name`) %>%
+                summarise("# Grants" = n(),
+                          "$ Amount" = (sum(`Grant Amount`)),
+                          "Balance" = (sum(unnacounted_amount)))
+              
+              temp_df_GPURL <-  temp_df %>% filter(GPURL_binary=="GPURL") %>% 
+                group_by(`Trustee Fund Name`) %>%
+                summarise("# Grants" = n(),
+                          "$ Amount" = (sum(`Grant Amount`)),
+                          "Balance" = (sum(unnacounted_amount)))
+              
+              temp_df_non_GPURL <- temp_df %>% filter(GPURL_binary=="Non-GPURL") %>% 
+                group_by(`Trustee Fund Name`) %>%
+                summarise("# Grants" = n(),
+                          "$ Amount" = (sum(`Grant Amount`)),
+                          "Balance" = (sum(unnacounted_amount)))
+              
+              
+              display_df_partial <- full_join(temp_df_GPURL,
+                                              temp_df_non_GPURL,
+                                              by="Trustee Fund Name",
+                                              suffix=c(" (GPURL)"," (Non-GPURL)"))
+              
+              
+              display_df_funding <- left_join(temp_df_all,display_df_partial,by="Trustee Fund Name")
+              
+              
+              #------ CREATE EXCEL WORKBOOK AND ADD DATAFRAMES -------
+              wb <- createWorkbook()
+              
+              #temp_df <- reactive_df()
+              report_title <- paste0("Summary of GFDRR Portfolio (as of ",report_data_date,")")
+              
+              addWorksheet(wb, "Portfolio Summary")
+              # mergeCells(wb,1,c(2,3,4),1)
+              
+              writeData(wb, 1,
+                        report_title,
+                        startRow = 1,
+                        startCol = 2)
+              
+              writeDataTable(wb, 1,  sum_display_df, startRow = 3, startCol = 2, withFilter = F)
+              writeDataTable(wb, 1,  display_df, startRow = 12, startCol = 2,withFilter = F)
+              writeDataTable(wb, 1,  display_df_funding, startRow = (15+(nrow(display_df))), startCol = 2,withFilter = F)
+              
+              #FORMULAS FOR TOTALS IN DISPLAY DF  -----------
+              end_row.display_df <- (12+nrow(display_df))
+              
+              writeFormula(wb,1,x=paste0("=SUM(C12:C",end_row.display_df,")"),startCol = 3,startRow = (end_row.display_df+1))
+              writeFormula(wb,1,x=paste0("=SUM(D12:D",end_row.display_df,")"),startCol = 4,startRow = (end_row.display_df+1))
+              writeFormula(wb,1,x=paste0("=SUM(E12:E",end_row.display_df,")"),startCol = 5,startRow = (end_row.display_df+1))
+              writeFormula(wb,1,x=paste0("=SUM(F12:F",end_row.display_df,")"),startCol = 6,startRow = (end_row.display_df+1))
+              writeFormula(wb,1,x=paste0("=SUM(G12:G",end_row.display_df,")"),startCol = 7,startRow = (end_row.display_df+1))
+              writeFormula(wb,1,x=paste0("=SUM(H12:H",end_row.display_df,")"),startCol = 8,startRow = (end_row.display_df+1))
+              writeFormula(wb,1,x=paste0("=SUM(I12:I",end_row.display_df,")"),startCol = 9,startRow = (end_row.display_df+1))
+              writeFormula(wb,1,x=paste0("=SUM(J12:J",end_row.display_df,")"),startCol = 10,startRow = (end_row.display_df+1))
+              writeFormula(wb,1,x=paste0("=SUM(K12:K",end_row.display_df,")"),startCol = 11,startRow = (end_row.display_df+1))
+              
+              writeData(wb,1,x="Total",startCol = 2,startRow = (end_row.display_df+1))
+              
+              #FORMULAS FOR TOTALS IN DISPLAY DF FUNDING -----------
+              start_row.funding <- (12+nrow(display_df)+4)
+              end_row.funding <- (12+nrow(display_df)+3+nrow(display_df_funding))
+              
+              writeFormula(wb,1,x=paste0("=SUM(C",start_row.funding,":C",end_row.funding,")"),startCol = 3,startRow = (end_row.funding+1))
+              writeFormula(wb,1,x=paste0("=SUM(D",start_row.funding,":D",end_row.funding,")"),startCol = 4,startRow = (end_row.funding+1))
+              writeFormula(wb,1,x=paste0("=SUM(E",start_row.funding,":E",end_row.funding,")"),startCol = 5,startRow = (end_row.funding+1))
+              writeFormula(wb,1,x=paste0("=SUM(F",start_row.funding,":F",end_row.funding,")"),startCol = 6,startRow = (end_row.funding+1))
+              writeFormula(wb,1,x=paste0("=SUM(G",start_row.funding,":G",end_row.funding,")"),startCol = 7,startRow = (end_row.funding+1))
+              writeFormula(wb,1,x=paste0("=SUM(H",start_row.funding,":H",end_row.funding,")"),startCol = 8,startRow = (end_row.funding+1))
+              writeFormula(wb,1,x=paste0("=SUM(I",start_row.funding,":I",end_row.funding,")"),startCol = 9,startRow = (end_row.funding+1))
+              writeFormula(wb,1,x=paste0("=SUM(J",start_row.funding,":J",end_row.funding,")"),startCol = 10,startRow = (end_row.funding+1))
+              writeFormula(wb,1,x=paste0("=SUM(K",start_row.funding,":K",end_row.funding,")"),startCol = 11,startRow = (end_row.funding+1))
+              
+              writeData(wb,1,x="Total",startCol = 2,startRow = (end_row.funding+1))
+              
+              dollar_format <- createStyle(numFmt = "$0,0")
+              percent_format <- createStyle(numFmt = "0%")
+              total_style <- createStyle(bgFill = "#5A52FA",fontColour = "#FFFFFF",textDecoration = "bold")
+              
+              addStyle(wb,1,dollar_format,row=5:6,cols=3)
+              addStyle(wb,1,dollar_format,row=5:6,cols=4)
+              addStyle(wb,1,dollar_format,row=5:6,cols=5)
+              addStyle(wb,1,percent_format,rows=7,cols=3:5)
+              
+              
+              
+              dollar_columns_Country_and_Trustee <- c(4,5,7,8,10,11)
+              
+              rows.display_df <- 12:(end_row.display_df+1)
+              rows.display_df_funding <- start_row.funding:(end_row.funding+1)
+              
+              for (i in dollar_columns_Country_and_Trustee){
+                addStyle(wb,1,dollar_format,rows=rows.display_df,cols = i)
+                addStyle(wb,1,dollar_format,rows=rows.display_df_funding,cols = i)
+              }
+              
+              addStyle(wb,1,total_style,rows=(end_row.display_df+1),cols = 2:11,stack=TRUE )
+              addStyle(wb,1,total_style,rows=(end_row.funding+1),cols = 2:11,stack=TRUE)
+              
+              setColWidths(wb, 1, cols = 1:ncol(display_df)+1, widths = "auto")
+              
+              
+              #openxlsx::openXL(wb)
+              
+              wb
+              
+            },file,overwrite = TRUE)
+          })
         
+        
+        
+        
+        
+        #-----------DOWNLOAD DISBURSEMENT RISK REPORT----------      
+        output$Download_risk_report.xlsx <- 
+          downloadHandler(
+            filename = function() {
+              paste("Risk Report",".xlsx", sep="")
+            },
+            content = function(file) {
+              openxlsx::saveWorkbook({
+                
+                data_date <- as.Date("2020-01-13")
+                
+                as.of.date <- "January 13 2020"
+                
+                all_regions <- c("AFR","SAR","LCR","MNA","ECA","EAP","Global")
+                current_trustee_subset <- c("TF072236","TF072584", "TF072129","TF071630")
+                
+                #for (i in all_regions) {
+                
+                
+                report_region <- ifelse(input$risk_region=="ALL",all_regions,input$risk_region)
+                trustee_subset <- input$risk_trustee
+                
+                #CODE------------------
+                grants <- read_xlsx('GFDRR Raw Data 1_13_20.xlsx',2)
+                
+                recode_trustee.2 <- read_xlsx("GFDRR Trustee Names.xlsx")
+                
+                grants <- left_join(grants,recode_trustee.2,by = c("Trustee"="Trustee"))
+                
+                
+                data <- grants %>% filter(`Child Fund Status` %in% input$risk_fund_status,
+                                          `Trustee Fund Name` %in% trustee_subset,
+                                          `Region Name` %in% report_region)
+                
+                #data <- grants
+                region <- report_region
+                
+                
+                funding_sources <- data$`Trustee Fund Name`  %>%
+                  unique() %>%
+                  paste(sep="",collapse= "; ")
+                wb <- createWorkbook()
+                df <- data %>% filter(`Grant Amount`>0)#,!is.na(`Activation Date`))
+                df <- df %>%  select(`Closing FY`,
+                                     Trustee,
+                                     `Trustee Fund Name`,
+                                     `Child Fund`,
+                                     `Child Fund Name`,
+                                     `Child Fund Status`,
+                                     `Project ID`,
+                                     `Execution Type`,
+                                     `Child Fund TTL Name`,
+                                     `Managing Unit Name`,
+                                     `Lead GP/Global Themes`,
+                                     Country,
+                                     `Activation Date`,
+                                     `Closing Date`,
+                                     `Grant Amount`,
+                                     `Cumulative Disbursements`,
+                                     `PO Commitments`,
+                                     `Months to Closing Date`) %>%
+                  mutate("Uncommitted Balance" =
+                           `Grant Amount` - (`Cumulative Disbursements` +`PO Commitments`)
+                  )
+                
+                df <- df %>% filter(`Uncommitted Balance`>0)
+                
+                elapsed_months <- function(end_date, start_date) {
+                  ed <- as.POSIXlt(end_date)
+                  sd <- as.POSIXlt(start_date)
+                  12 * (ed$year - sd$year) + (ed$mon - sd$mon)
+                }
+                
+                #df$`Child Fund Months Active` <-  elapsed_months(data_date,df$`Activation Date`)
+                
+                df$`Months to Closing Date 2` <- as.numeric(round(
+                  (difftime(
+                    strptime(df$`Closing Date`, format = "%Y-%m-%d"),
+                    strptime(data_date, format = "%Y-%m-%d"),
+                    units="days")
+                  )/30,digits = 1
+                ))
+                
+                df$`Uncommitted Balance (Percent)` <- df$`Uncommitted Balance`/df$`Grant Amount` 
+                
+                df$`Required Monthly Disbursement Rate` <- (df$`Uncommitted Balance` /df$`Grant Amount`)/
+                  (ifelse(df$`Months to Closing Date 2`>=1,df$`Months to Closing Date 2`,1))
+                
+                
+                compute_risk_level <- function (x){
+                  
+                  risk_level <- ifelse(abs(x) < .03,"Low Risk",
+                                       ifelse(abs(x) < .05,"Medium Risk",
+                                              ifelse(abs(x) < .10,"High Risk",
+                                                     "Very High Risk")))
+                  
+                  return(risk_level)
+                }
+                
+                df$`Disbursement Risk Level` <- compute_risk_level(df$`Required Monthly Disbursement Rate`)
+                
+                df <- df %>% arrange(abs(as.numeric(`Required Monthly Disbursement Rate`)))
+                
+                df$`Grace Period` <- ifelse(df$`Months to Closing Date 2`<0,
+                                            "Yes",
+                                            "No")
+                
+                
+                
+                df <- df %>% select(-`Months to Closing Date`) %>% 
+                  dplyr::rename("Months to Closing Date" = `Months to Closing Date 2`)
+                
+                df$grace_period_divider <- ifelse((4 + df$`Months to Closing Date`)>=1,
+                                                  (4 + df$`Months to Closing Date`),
+                                                  1)
+                df$`Required Monthly Disbursement Rate` <- ifelse(df$`Months to Closing Date`<0,
+                                                                  (df$`Uncommitted Balance (Percent)`/df$grace_period_divider),
+                                                                  df$`Required Monthly Disbursement Rate`)
+                
+                df <- df %>% select(-grace_period_divider)
+                
+                df$funding_sources <- paste0(df$`Trustee Fund Name`," (",df$Trustee,")")
+                
+                # names_trustee_subset <- left_join(as.data.frame(trustee_subset),
+                #   recode_trustee.2,by=c("trustee_subset"="Trustee")) %>% 
+                # mutate(name_number = paste0(`Trustee Fund Name`," (",trustee_subset,")"))
+                
+                trustee_subset_names_number <- sort(unique(df$funding_sources)) %>%
+                  paste(sep="",collapse="; ")
+                
+                df <- df %>% select(-funding_sources)
+                
+                df$`Activation Date` <- as.Date.POSIXct(df$`Activation Date`)
+                
+                df$`Months to Closing Date`<- round(df$`Months to Closing Date`,digits = 0)
+                
+                options("openxlsx.dateFormat", "mm/dd/yyyy")
+                wb <- createWorkbook()
+                report_title <- paste("Disbursement Risk for",input$risk_region,"region(s) as of",as.of.date)
+                funding_sources <- paste("Funding Sources:",trustee_subset_names_number)
+                
+                addWorksheet(wb, input$risk_region)
+                mergeCells(wb,1,cols = 2:8,rows = 1)
+                mergeCells(wb,1,cols = 2:8,rows = 2)
+                
+                writeData(wb, 1,
+                          report_title,
+                          startRow = 1,
+                          startCol = 2)
+                
+                writeData(wb, 1,
+                          funding_sources,
+                          startRow = 2,
+                          startCol = 2)
+                
+                writeDataTable(wb, 1, df, startRow = 4, startCol = 2)
+                
+                
+                low_risk <- createStyle(fgFill ="#86F9B7",halign = "left")
+                medium_risk <- createStyle(fgFill ="#FFE285",halign = "left")
+                high_risk <- createStyle(fgFill ="#FD8D75",halign = "left")
+                very_high_risk <- createStyle(fgFill ="#F17979",halign = "left")
+                
+                low_risk_rows <- which(df$`Disbursement Risk Level`=="Low Risk")
+                medium_risk_rows <- which(df$`Disbursement Risk Level`=="Medium Risk")
+                high_risk_rows <- which(df$`Disbursement Risk Level`=="High Risk")
+                very_high_risk_rows <- which(df$`Disbursement Risk Level`=="Very High Risk")
+                
+                
+                for (i in low_risk_rows){
+                  addStyle(wb,1,rows=i+4,cols=1:length(df) + 1,style = low_risk)
+                }
+                
+                for (i in medium_risk_rows){
+                  addStyle(wb,1,rows=i+4,cols=1:length(df) + 1,style = medium_risk)
+                }
+                
+                for (i in high_risk_rows){
+                  addStyle(wb,1,rows=i+4,cols=1:length(df) + 1,style = high_risk)
+                }
+                
+                for (i in very_high_risk_rows){
+                  addStyle(wb,1,rows=i+4,cols=1:length(df) + 1,style = very_high_risk)
+                }
+                
+                header_style <- createStyle(borderColour = getOption("openxlsx.borderColour", "black"),
+                                            borderStyle = getOption("openxlsx.borderStyle", "thick"),
+                                            halign = 'center',
+                                            valign = 'center',
+                                            textDecoration = NULL,
+                                            wrapText = TRUE)
+                
+                dollar_format <- createStyle(numFmt = "ACCOUNTING")
+                percent_format <- createStyle(numFmt = "0.0%")
+                date_format <- createStyle(numFmt = "mm/dd/yyyy")
+                
+                addStyle(wb,1,rows=4,cols=2:(length(df)+1),style = header_style)
+                
+                number_format_range <- 5:(nrow(df)+5)
+                
+                
+                addStyle(wb,1,rows=number_format_range,cols=14,style = date_format,stack = TRUE)
+                addStyle(wb,1,rows=number_format_range,cols=15,style = date_format,stack = TRUE) 
+                addStyle(wb,1,rows=number_format_range,cols=19,style = dollar_format,stack = TRUE)
+                addStyle(wb,1,rows=number_format_range,cols=16,style = dollar_format,stack = TRUE)
+                addStyle(wb,1,rows=number_format_range,cols=17,style = dollar_format,stack = TRUE)
+                addStyle(wb,1,rows=number_format_range,cols=18,style = dollar_format,stack = TRUE)
+                addStyle(wb,1,rows=number_format_range,cols=21,style = percent_format,stack = TRUE)
+                addStyle(wb,1,rows=number_format_range,cols=22,style = percent_format,stack = TRUE)
+                
+                setColWidths(wb, 1, cols=2:length(df)+1, widths = "auto")
+                setColWidths(wb, 1, cols=6, widths = 90) #child fund name
+                setColWidths(wb, 1, cols=9, widths = 9)
+                setColWidths(wb, 1, cols=11, widths = 11)
+                setColWidths(wb, 1, cols=13, widths = 25)
+                setColWidths(wb, 1, cols=17, widths = 15)
+                setColWidths(wb, 1, cols=19, widths = 14)
+                setColWidths(wb, 1, cols=20, widths = 15)
+                setColWidths(wb, 1, cols=21, widths = 19)
+                setColWidths(wb, 1, cols=22, widths = 15)
+                setColWidths(wb, 1, cols=23, widths = 15)
+                
+                wb
+                
+              },file,overwrite = TRUE)
+              
+            })
+        
+        
+        
+        
+        
+        
+              
         
         # output$TTL_balance_GG <- renderPlotly({
         #   df <- reactive(TTL)
@@ -3105,6 +3558,14 @@ server <- shinyServer(function(input,output,session) {
         #     )
         # })
         # 
+        
+        
+        
+        
+        
+        
+        
+        
         
         
         

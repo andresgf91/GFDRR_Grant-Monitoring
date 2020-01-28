@@ -163,16 +163,25 @@ server <- shinyServer(function(input,output,session) {
         labs(y = "Expected Contribution (USD M)",
              x = "Trustee") +
         #theme(axis.text.x = element_text(angle=90)) +
-        coord_flip() +
+        #coord_flip() +
         #scale_fill_discrete(name = "Contributions", labels = c("Un-paid", "Paid")) +
-        scale_fill_manual(name=NULL,values = c("#2E2EFE", "#CED8F6", "#56B4E9")) #+
+        scale_fill_manual(name=NULL,values = c("#2E2EFE", "#CED8F6", "#56B4E9")) + #+
+       theme(axis.text.x = element_text(angle = 90, hjust = 1))
        # theme(
        #   rect = element_rect(fill = "transparent"),
        #   plot.background = element_rect(fill = "transparent", color = NA),
        #   panel.background = element_rect(fill = "transparent")
       #  ) 
       
-      ggplotly(trustee_contributions_GG,tooltip = "text")
+      
+      m <- list(
+        l = 5,
+        r = 5,
+        b = 5,
+        t = 5,
+        pad = 0
+      )
+      ggplotly(trustee_contributions_GG,tooltip = "text") %>% layout(margin=m)
       
       
       })
@@ -531,37 +540,45 @@ server <- shinyServer(function(input,output,session) {
     output$n_grants_region <- renderPlotly({
       
       temp_df <- grants %>% filter(`Fund Status`=="ACTV",PMA=="no")
-      gg <- temp_df %>% 
+      temp_df <- temp_df %>% 
         group_by(Region) %>%
-        summarise(n_grants = n(), total_award_amount = sum(`Grant Amount USD`)) %>%
-        ggplot(aes(x=reorder(Region,n_grants),y=n_grants,fill=Region,
-                   text=paste(Region,
-                              "\n",
-                              "Number of Grants:",
-                              n_grants,
-                              "\n",
-                              "Total Awards Amount:",
-                              dollar(total_award_amount)))) +
-        geom_col(fill='royalblue',alpha=.7) +
-        theme_classic() +
-        labs(x="Region", y="Number of Grants")
-      # +
-      #   theme(rect = element_rect(fill="transparent"),
-      #         plot.background = element_rect(fill="transparent",color=NA),
-      #         panel.background = element_rect(fill="transparent")) 
+        summarise(n_grants = n(), total_award_amount = sum(`Grant Amount USD`)) 
       
-      plotly::ggplotly(gg, tooltip = "text") 
+      temp_df <- left_join(temp_df,dplyr::distinct(select(.data = grants,Region,region_color)))
+      
+      # gg <- temp_df%>%
+      #   ggplot(aes(x=reorder(Region,n_grants),y=n_grants,fill=r_color,
+      #              text=paste(Region,
+      #                         "\n",
+      #                         "Number of Grants:",
+      #                         n_grants,
+      #                         "\n",
+      #                         "Total Awards Amount:",
+      #                         dollar(total_award_amount)))) +
+      #   geom_col(fill='royalblue',alpha=.7) +
+      #   theme_classic() +
+      #   labs(x="Region", y="Number of Grants")
+
+     temp_df$Region <- factor(temp_df$Region,
+                              levels = unique(temp_df$Region)[order(temp_df$n_grants, decreasing = TRUE)])
+     
+     plot_ly(data=temp_df,
+              type="bar",
+              marker=~list(color=region_color),
+              x=~Region,
+              y=~n_grants) %>% layout(yaxis = list(title = 'Number of Grants'))
       
     })
   
     
     output$funding_region <- renderPlotly({
       
-      temp_df <- grants %>%
-        filter(`Fund Status`=="ACTV")
-      data <- temp_df %>% 
+      data <- grants %>%
+        filter(PMA=="no") %>% 
         group_by(Region) %>% 
-        summarise(n_grants = n(), total_award_amount = sum(`Grant Amount USD`))
+        summarise(n_grants = n(),
+                  total_award_amount = sum(`Grant Amount USD`),
+                  region_color=unique(region_color))
       
       total <- sum(data$total_award_amount)
       
@@ -573,18 +590,36 @@ server <- shinyServer(function(input,output,session) {
         pad = 2
       )
       
-      plot_ly(data,
-              labels = ~Region,
-              values = ~total_award_amount,
-              text = ~paste0(round(total_award_amount/total*100,digits=1)," %",
-                            "\n","(",n_grants," grants)"),
-              hoverinfo = 'label+value+text',
-              textinfo = 'percent',
-              type = 'pie',
-              rotation=75) %>%
-        layout(xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
-               yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
-              margin=m)
+      # plot_ly(data,
+      #         labels = ~Region,
+      #         values = ~total_award_amount,
+      #         hovertext = ~paste0(round(total_award_amount/total*100,digits=1)," %",
+      #                       "\n","(",n_grants," grants)"),
+      #         text=~percent(total_award_amount/total,accuracy = 0.1),
+      #         hoverinfo = 'text',
+      #         textinfo = 'text',
+      #         type = 'pie',
+      #         rotation=75,
+      #         marker = ~list(colors = r_color)) %>%
+      #   layout(xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+      #          yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+      #         margin=m)
+      # 
+      
+     data$Region <- factor(data$Region,
+                               levels = unique(data$Region)[order(data$total_award_amount, decreasing = TRUE)])
+      
+     
+     data$percentage <- data$total_award_amount/sum(data$total_award_amount)
+      plot_ly(data=data,
+              type="bar",
+              marker=~list(color=region_color),
+              x=~Region,
+              y=~total_award_amount,
+              hoverinfo='text',
+              hovertext=~paste0(Region,"\n",dollar(total_award_amount),"\n",percent(percentage))) %>%
+        layout(yaxis = list(title = 'Grant Amount'))
+      
     })
     
     
@@ -603,26 +638,39 @@ server <- shinyServer(function(input,output,session) {
         summarise(n_grants=sum(n_grants),
                   total_award_amount=sum(total_award_amount))
       m <- list(
-        l = 50,
-        r = 20,
-        b = 40,
-        t = 30,
-        pad = 4
+        l = 5,
+        r = 5,
+        b = 15,
+        t = 15,
+        pad = 2
       )
+      
+      data$pie_name[data$pie_name=="Environment, Natural Resources & the Blue Economy"] <- "Environment, Natural Resources \n& the Blue Economy"
+      
+      data$pie_name[data$pie_name=="Finance, Competitiveness and Innovation"] <- "Finance, Competitiveness \n& Innovation"
+      
+      
+      
       
       
       plot_ly(data,
               labels = ~pie_name,
               values = ~total_award_amount,
-              text = ~paste0(round(total_award_amount/total*100,digits=1)," % of total funding",
-                             "\n","(",n_grants," grants)"),
-              hoverinfo = 'label+value+text',
-              textinfo = 'percent',
+              text = ~paste0(percent(total_award_amount/total,accuracy = 0.1)),
+              hovertext= ~paste0(pie_name,"\n",
+                                 dollar(total_award_amount),"\n",
+                                 round(total_award_amount/total*100,digits=1)," % of total funding",
+                                "\n","(",n_grants," grants)"),
+              hoverinfo = 'text',
+              textinfo = 'text',
               type = 'pie',
-              rotation=75) %>%
+              rotation=75,
+              domain = list(x = c(0.1, 0.95), y = c(0, 0.90))) %>%
         layout(xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
                yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
-               margin=m,showlegend = FALSE)
+               margin=m,
+               showlegend = T,
+               legend = list(font = list(size = 9)))
       
       
     })
@@ -773,7 +821,7 @@ server <- shinyServer(function(input,output,session) {
       
       data <- temp_df %>% 
         group_by(Region) %>% 
-        summarise(n_grants = n(), total_award_amount = sum(`Grant Amount USD`))
+        summarise(n_grants = n(), total_award_amount = sum(`Grant Amount USD`), r_color=unique(region_color))
       
       total <- sum(data$total_award_amount)
       
@@ -781,7 +829,8 @@ server <- shinyServer(function(input,output,session) {
               text=~paste0(round(total_award_amount/total*100,digits=1)," %",
                            "\n","(",n_grants," grants)"),
               hoverinfo="label+value+text",
-              textinfo='text') %>%
+              textinfo='text',
+              marker=~list(colors=r_color)) %>%
         layout(xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
                yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
                title = "RETF Funding per Region",margin=m)
@@ -935,13 +984,13 @@ server <- shinyServer(function(input,output,session) {
               title="Active Funds",
               labels=~variable,
               values = ~value,
-              textinfo= 'percent',
-              text=  ~paste0(dollar(value),"\n",percent(percentage)),
-              hoverinfo="label+text",
+              textinfo= ~percent(percentage,accuracy = 0.1),
+              hoverinfo='text',
+              #text=  ~paste0(dollar(value),"\n",percent(percentage)),
+              hovertext=~paste0(variable,"\n",dollar(value),"\n",percent(percentage)),
               marker = list(colors=colors),
               hole = 0.75,
-              rotation=75,
-              showpercent=F) %>% 
+              rotation=75) %>% 
             layout(xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
                    yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
                    margin=m,
@@ -1034,7 +1083,9 @@ server <- shinyServer(function(input,output,session) {
         temp_df <- reactive_grants_trustee()
         gg <- temp_df %>% 
           group_by(Region) %>%
-          summarise(n_grants = n(), total_award_amount = sum(`Grant Amount USD`)) %>%
+          summarise(n_grants = n(),
+                    total_award_amount = sum(`Grant Amount USD`),
+                    region_color=unique(region_color)) %>%
           ggplot(aes(x=reorder(Region,n_grants),y=n_grants,
                      text=paste(Region,
                                 "\n",
@@ -1057,39 +1108,111 @@ server <- shinyServer(function(input,output,session) {
         
         plotly::ggplotly(gg, tooltip = "text") %>% layout(margin=m)
         
+        temp_df <- reactive_grants_trustee()
+  
+        temp_df <- temp_df %>%
+          filter(PMA=="no") %>% 
+          group_by(Region) %>%
+          summarise(n_grants = n(), total_award_amount = sum(`Grant Amount USD`)) 
+        
+        temp_df <- left_join(temp_df,dplyr::distinct(select(.data = grants,Region,region_color)))
+        
+        # gg <- temp_df%>%
+        #   ggplot(aes(x=reorder(Region,n_grants),y=n_grants,fill=r_color,
+        #              text=paste(Region,
+        #                         "\n",
+        #                         "Number of Grants:",
+        #                         n_grants,
+        #                         "\n",
+        #                         "Total Awards Amount:",
+        #                         dollar(total_award_amount)))) +
+        #   geom_col(fill='royalblue',alpha=.7) +
+        #   theme_classic() +
+        #   labs(x="Region", y="Number of Grants")
+        
+        temp_df$Region <- factor(temp_df$Region,
+                                 levels = unique(temp_df$Region)[order(temp_df$n_grants, decreasing = TRUE)])
+        
+        plot_ly(data=temp_df,
+                type="bar",
+                marker=~list(color=region_color),
+                x=~Region,
+                y=~n_grants,
+                hovertext=~paste0(Region,"\n",n_grants," active grants"),
+                hoverinfo="text") %>%
+          layout(yaxis = list(title = 'Number of Grants'))
+        
+        
+        
+        
+        
       })
       
       output$trustee_region_GG <- renderPlotly({
         
-        temp_df <- reactive_grants_trustee()
-        gg <- temp_df %>% 
-          group_by(Region) %>%
+        # temp_df <- reactive_grants_trustee()
+        # gg <- temp_df %>% 
+        #   group_by(Region) %>%
+        #   summarise(n_grants = n(),
+        #             total_award_amount = sum(`Grant Amount USD`),
+        #             total_remaining_balance=sum(unnacounted_amount)) %>%
+        #   ggplot(aes(x=reorder(Region,total_award_amount),y=total_award_amount,
+        #              text=paste(Region,
+        #                         "\n",
+        #                         "Number of Grants:",
+        #                         n_grants,
+        #                         "\n",
+        #                         "Active Grants Amount:",
+        #                         dollar(total_award_amount),"\n",
+        #                         "Uncommitted Balance:",dollar(total_remaining_balance)))) +
+        #   geom_col(fill='royalblue') +
+        #   theme_classic() +
+        #   labs(x="Region", y="Funds in active grants") +
+        #   scale_y_continuous(labels=dollar_format(prefix="$"))
+        # 
+        # m <- list(
+        #   l = 15,
+        #   r = 5,
+        #   b = 5,
+        #   t = 5,
+        #   pad = 4
+        # )
+        # 
+        # plotly::ggplotly(gg, tooltip = "text") %>% layout(margin=m)
+        # 
+        data <- reactive_grants_trustee()
+        
+        data <- data %>%
+          #filter(PMA=="no") %>% 
+          group_by(Region) %>% 
           summarise(n_grants = n(),
                     total_award_amount = sum(`Grant Amount USD`),
-                    total_remaining_balance=sum(unnacounted_amount)) %>%
-          ggplot(aes(x=reorder(Region,total_award_amount),y=total_award_amount,
-                     text=paste(Region,
-                                "\n",
-                                "Number of Grants:",
-                                n_grants,
-                                "\n",
-                                "Active Grants Amount:",
-                                dollar(total_award_amount),"\n",
-                                "Uncommitted Balance:",dollar(total_remaining_balance)))) +
-          geom_col(fill='royalblue') +
-          theme_classic() +
-          labs(x="Region", y="Funds in active grants") +
-          scale_y_continuous(labels=dollar_format(prefix="$"))
+                    region_color=unique(region_color))
+        
+        total <- sum(data$total_award_amount)
         
         m <- list(
-          l = 15,
+          l = 20,
           r = 5,
-          b = 5,
-          t = 5,
-          pad = 4
+          b = 10,
+          t = 10,
+          pad = 2
         )
         
-        plotly::ggplotly(gg, tooltip = "text") %>% layout(margin=m)
+        
+        data$Region <- factor(data$Region,
+                              levels = unique(data$Region)[order(data$total_award_amount, decreasing = TRUE)])
+        
+        
+        data$percentage <- data$total_award_amount/sum(data$total_award_amount)
+        plot_ly(data=data,
+                type="bar",
+                marker=~list(color=region_color),
+                x=~Region,
+                y=~total_award_amount,
+                hoverinfo='text',
+                hovertext=~paste0(Region,"\n",dollar(total_award_amount),"\n",percent(percentage))) %>%
+          layout(yaxis = list(title = 'Grant Amount'))
         
       })
       
@@ -1366,54 +1489,115 @@ server <- shinyServer(function(input,output,session) {
                                 dollar(total_award_amount)))) +
           geom_col(fill='royalblue') +
           theme_classic() +
-          coord_flip() +
-          labs(x="Trustee Name", y="Number of Grants")
+         # coord_flip() +
+          labs(x="Trustee Name", y="Number of Grants") +
+          theme(axis.text.x = element_text(angle = 90, hjust = 1,size=7))
+        
+        m <- list(
+          l = 5,
+          r = 5,
+          b = 5,
+          t = 5
+        )
+        
 
-       plotly::ggplotly(gg, tooltip = "text")
+       plotly::ggplotly(gg, tooltip = "text") %>% layout(margin=m)
 
       })
       
       output$region_GP_GG <- renderPlotly({
         
         temp_df <- reactive_df() 
-  
-         data <- temp_df %>% 
+        
+        
+        
+        data <- temp_df %>% 
           group_by(`Lead GP/Global Themes`) %>% 
           summarise(n_grants = n(), total_award_amount = sum(`Grant Amount USD`))
+        
+        total <- sum(data$total_award_amount)
+        data$percent.1 <- data$total_award_amount/total
+        
+        data$pie_name <- ifelse(data$percent.1 >=.01,data$`Lead GP/Global Themes`,"Other")
+        
+        data <- data %>% group_by(pie_name) %>%
+          summarise(n_grants=sum(n_grants),
+                    total_award_amount=sum(total_award_amount))
+        m <- list(
+          l = 5,
+          r = 5,
+          b = 15,
+          t = 15,
+          pad = 2
+        )
+        
+        data$pie_name[data$pie_name=="Environment, Natural Resources & the Blue Economy"] <- "Environment, Natural Resources \n& the Blue Economy"
+        
+        data$pie_name[data$pie_name=="Finance, Competitiveness and Innovation"] <- "Finance, Competitiveness \n& Innovation"
+        
+        
+        
+        
+        
+        plot_ly(data,
+                labels = ~pie_name,
+                values = ~total_award_amount,
+                text = ~paste0(percent(total_award_amount/total,accuracy = 0.1)),
+                hovertext= ~paste0(pie_name,"\n",
+                                   dollar(total_award_amount),"\n",
+                                   round(total_award_amount/total*100,digits=1)," % of total funding",
+                                   "\n","(",n_grants," grants)"),
+                hoverinfo = 'text',
+                textinfo = 'text',
+                type = 'pie',
+                rotation=75,
+                domain = list(x = c(0.105, 0.98), y = c(0, 0.90))) %>%
+          layout(xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+                 yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+                 margin=m,
+                 showlegend = T,
+                 legend = list(font = list(size = 8)))
+        
+        
+        
+         # 
+         # data <- temp_df %>% 
+         #  group_by(`Lead GP/Global Themes`) %>% 
+         #  summarise(n_grants = n(), total_award_amount = sum(`Grant Amount USD`))
+         # 
          
-         
-         total <- sum(data$total_award_amount)
-         data$percent.1 <- data$total_award_amount/total
-         
-         data$pie_name <- ifelse(data$percent.1 >=.01,data$`Lead GP/Global Themes`,"Other")
-         
-         data <- data %>% group_by(pie_name) %>%
-           summarise(n_grants=sum(n_grants),
-                     total_award_amount=sum(total_award_amount))
-         
-         
-         m <- list(
-           l = 10,
-           r = 10,
-           b = 10,
-           t = 10,
-           pad = 4
-         )
-         
-         plot_ly(data,
-                 labels = ~pie_name,
-                 values = ~total_award_amount,
-                 text = ~paste0(percent(total_award_amount/total,accuracy = .1),
-                                "\n","(",n_grants," grants)",
-                                "\n", dollar(total_award_amount)),
-                 hoverinfo = 'label+text',
-                 textinfo = 'percent',
-                 type = 'pie',
-                 showlegend = FALSE,
-                 rotation=50) %>%
-           layout(xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
-                  yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
-                  margin=m)
+         # total <- sum(data$total_award_amount)
+         # data$percent.1 <- data$total_award_amount/total
+         # 
+         # data$pie_name <- ifelse(data$percent.1 >=.01,data$`Lead GP/Global Themes`,"Other")
+         # 
+         # data <- data %>% group_by(pie_name) %>%
+         #   summarise(n_grants=sum(n_grants),
+         #             total_award_amount=sum(total_award_amount))
+         # 
+         # 
+         # m <- list(
+         #   l = 10,
+         #   r = 10,
+         #   b = 10,
+         #   t = 10,
+         #   pad = 4
+         # )
+         # 
+         # plot_ly(data,
+         #         labels = ~pie_name,
+         #         values = ~total_award_amount,
+         #         text = ~paste0(percent(total_award_amount/total,accuracy = .1),
+         #                        "\n","(",n_grants," grants)",
+         #                        "\n", dollar(total_award_amount)),
+         #         hoverinfo = 'label+text',
+         #         textinfo = 'percent',
+         #         type = 'pie',
+         #         showlegend = FALSE,
+         #         rotation=50) %>%
+         #   layout(xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+         #          yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+         #          margin=m)
         
       })
       
@@ -2054,7 +2238,7 @@ server <- shinyServer(function(input,output,session) {
           nrow()
           valueBox(value = tags$p(valor, style = "font-size: 85%;"),
                    color='navy',
-                   subtitle = show_grant_button("3 plus active mos no committment","show_region_grants_no_discom")
+                   subtitle = show_grant_button("3+ mos active, no commitments ","show_region_grants_no_discom")
                    )
 
       })
@@ -2090,7 +2274,7 @@ server <- shinyServer(function(input,output,session) {
         valor <- temp_df %>% filter(`Transfer-in USD`==0) %>%
           nrow() 
           valueBox(value = tags$p(valor, style = "font-size: 85%;"),
-                   subtitle = show_grant_button("Active without initial transfer",
+                   subtitle = show_grant_button("Active, no initial transfer ",
                                                 "show_grants_no_first_transfer"),
                    color = 'navy')
         

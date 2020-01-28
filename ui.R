@@ -38,7 +38,7 @@ source("Plots.R")
 
 ## Header ---------------
 Header <- dashboardHeaderPlus(
-                          #dropdownMenuOutput("date_data_updated_message"),
+                          dropdownMenuOutput("date_data_updated_message"),
                          # disable = F,
                           enable_rightsidebar = TRUE,
                           rightSidebarIcon = "gears"
@@ -55,7 +55,7 @@ secretariat_view <-   # menuItem("Secretariat View",icon = icon("dashboard"),
 info <-             #menuSubItem("PMA",
                               #  tabName = "PMA",
                               #  icon = icon("stream")),
-                    menuItem("Additional Info",
+                    menuItem("Additional Information",
                              tabName = "admin_info",
                              icon = icon("info"))
 
@@ -64,7 +64,7 @@ parent_trust_fund_view <-   menuItem("Parent Trust Fund",
                        icon = icon("funnel-dollar"),
                        selected = F)
 
-regions_view <-  menuItem("Grants Costum View",
+regions_view <-  menuItem("Grant Portfolio",
                        tabName = "regions",
                        icon = icon("search-plus"),selected = F)
 
@@ -84,8 +84,8 @@ reports_tab <- menuItem("Download Reports",
 
 Sidebar <- dashboardSidebar(#collapsed = TRUE,
                             sidebarMenu( secretariat_view,
+                                         parent_trust_fund_view,
                                          regions_view,
-                                        parent_trust_fund_view,
                                         info,
                                         reports_tab,
                                        # TTL_grant_detail,
@@ -105,15 +105,7 @@ tab.1 <-  tabItem(tabName = "overview",
                       ),
                       column(
                         width = 4,
-                        boxPlus(
-                          plotlyOutput("n_grants_region", height = 260),
-                          title='Grants by Region',
-                          background = "blue",
-                          enable_label = T,
-                          label_text = NULL,
-                          width = NULL,
-                          collapsible = TRUE,
-                          closable = F),
+                       
                         boxPlus(plotlyOutput("funding_region", height = "260px"),
                                 title='Funding by Region',
                                 background = "blue",
@@ -122,7 +114,7 @@ tab.1 <-  tabItem(tabName = "overview",
                                 width = NULL,
                                 collapsible = TRUE,
                                 closable = F,
-                                collapsed = TRUE),
+                                collapsed = F),
                         boxPlus(plotlyOutput("funding_GP", height = "260px"),
                                 title='Funding by Global Practice',
                                 background = "blue",
@@ -131,7 +123,17 @@ tab.1 <-  tabItem(tabName = "overview",
                                 width = NULL,
                                 collapsible = TRUE,
                                 closable = FALSE,
-                                collapsed = TRUE )
+                                collapsed = F),
+                        boxPlus(
+                          plotlyOutput("n_grants_region", height = 260),
+                          title='Grants by Region',
+                          background = "blue",
+                          enable_label = T,
+                          label_text = NULL,
+                          width = NULL,
+                          collapsible = TRUE,
+                          closable = F,
+                          collapsed = F)
                        # plotlyOutput("funding_GP", height = 550)
                       ),
                       column(
@@ -338,7 +340,7 @@ tab.3 <-  tabItem(tabName = "regions",
                             
                         boxPlus(
                           plotlyOutput(outputId = "focal_region_n_grants_GG",
-                                       height="260px"),
+                                       height="400px"),
                           title='Active Grants by Trustee',
                           background = "navy",
                           enable_label = T,

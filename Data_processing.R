@@ -288,3 +288,6 @@ grants$PMA.2 <- ifelse(grants$PMA=="yes","PMA","Operational")
  grants <- grants %>% mutate(GPURL_binary = ifelse(`Lead GP/Global Themes`=="Urban, Resilience and Land",
                                "GPURL",
                                "Non-GPURL"))
+ 
+grants$region_color <- factor(grants$Region, labels = RColorBrewer::brewer.pal(length(unique(grants$Region)), name = "Set3"))
+

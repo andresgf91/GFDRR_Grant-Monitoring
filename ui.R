@@ -29,9 +29,9 @@ library(DT)
 library(shinythemes)
 library(shinyjs)
 
-source("data_import.R")
-source('Data_processing.R')
-source("Plots.R")
+#source("data_import.R")
+#source('Data_processing.R')
+#source("Plots.R")
 
 
 # BUILD USER INTERFACE ----------------------------------------------------
@@ -290,7 +290,7 @@ tab.2 <- tabItem(tabName= "parent_tf",
 
 tab.3 <-  tabItem(tabName = "regions",
                   class = 'active',
-                    titlePanel("Grants View"),
+                    titlePanel("Grant Portfolio"),
                     fluidRow(
                       column(width=3,
                              valueBoxOutput(outputId = "focal_active_grants",width = 12),
@@ -330,7 +330,7 @@ tab.3 <-  tabItem(tabName = "regions",
                             boxPlus(
                               plotlyOutput(outputId = "disbursement_risk_GG", height="260px"),
                               title='Grants Disbursement Risk',
-                              background = "navy",
+                              background = "blue",
                               enable_label = T,
                               label_text = NULL,
                               width = 12,
@@ -342,7 +342,7 @@ tab.3 <-  tabItem(tabName = "regions",
                           plotlyOutput(outputId = "focal_region_n_grants_GG",
                                        height="400px"),
                           title='Active Grants by Trustee',
-                          background = "navy",
+                          background = "light-blue",
                           enable_label = T,
                           label_text = NULL,
                           width = 12,
@@ -527,7 +527,7 @@ tab.reports <- tabItem(
            selectInput(inputId = "report_type",label=NULL,
                        choices= c("Summary Report",
                                   "Disbursement Risk Report",
-                                  "Sameh Report"),
+                                  "Master Report"),
                        selectize=TRUE)),
     column(width=4,
            conditionalPanel(
@@ -582,6 +582,9 @@ tab.reports <- tabItem(
                                     label = 'Download Report')),
     conditionalPanel(condition = "input.report_type == 'Disbursement Risk Report'",
                      downloadButton("Download_risk_report.xlsx",
+                                    label = 'Download Report')),
+    conditionalPanel(condition = "input.report_type == 'Master Report'",
+                     downloadButton("Download_master_report.xlsx",
                                     label = 'Download Report'))
   )
 )

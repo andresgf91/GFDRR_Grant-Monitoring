@@ -44,16 +44,26 @@ server <- shinyServer(function(input,output,session) {
           icon="desktop",
           active=TRUE,
           selectInput('select_trustee',"Selected trustee:",
-                      choices = sort(unique(active_trustee$temp.name[active_trustee$`Net Signed Condribution in USD`>0])),
-                      selected = active_trustee$temp.name[active_trustee$`Net Signed Condribution in USD`>0][1]),
-          selectInput('trustee_select_region',"Selected Regions:",
-                      choices = sort(unique(grants$temp.name)),
-                      multiple = TRUE,
-                      #selectize = TRUE,
-                      selected =  sort(unique(grants$temp.name)))
+                      choices = sort(unique(active_trustee$temp.name[active_trustee$`Net Signed Condribution in USD`>=0])),
+                      selected = active_trustee$temp.name[active_trustee$`Net Signed Condribution in USD`>=0][1]),
+
+          checkboxGroupButtons(
+            inputId = "trustee_select_region",
+            label = "Select Regions:", size = "sm",
+            choices = sort(unique(grants$Region)), 
+            justified = F,
+            status = "primary",
+            individual = T,
+            width='100%',
+            checkIcon = list(yes = icon("ok", lib = "glyphicon"),
+                             no = icon("remove", lib = "glyphicon"))
+          )
         )
         
+   
       })
+      
+      output$r2 <- renderPrint(input$p2)
     }
     if (req(input$nav) == "regions"){
       shinyjs::addClass(selector = "aside.control-sidebar", class = "control-sidebar-open")
@@ -66,8 +76,8 @@ server <- shinyServer(function(input,output,session) {
             "Selected region(s):",
             choices = sort(unique(grants$Region)),
             multiple = TRUE,
-            selectize = TRUE,
-            selected = sort(unique(grants$Region))
+            selectize = TRUE#,
+            #selected = sort(unique(grants$Region))
           ),
           selectInput(
             'focal_select_trustee',
@@ -106,11 +116,13 @@ server <- shinyServer(function(input,output,session) {
       })
     }
     if (req(input$nav) == "overview"){
+      shinyjs::addClass(selector = "aside.control-sidebar", class = "control-sidebar-open")
       shinyjs::removeClass(selector = "aside.control-sidebar", class = "control-sidebar-open")
       
-      output$side_bar <- renderUI({ div() })
+      output$side_bar <- NULL
     }
     if (req(input$nav) == "admin_info"){
+      shinyjs::addClass(selector = "aside.control-sidebar", class = "control-sidebar-open")
       shinyjs::removeClass(selector = "aside.control-sidebar", class = "control-sidebar-open")
       
       output$side_bar <- renderUI({ div() })
@@ -679,6 +691,12 @@ server <- shinyServer(function(input,output,session) {
     
     
     output$donor_contributions <- renderTable({
+      
+      
+      
+      active_trustee$`Donor Agency Name`[active_trustee$`Donor Name`=='Multi Donor'] <- "Multiple Donors"
+      
+      
       active_trustee %>% group_by(`Donor Name`,`Donor Agency Name`) %>%
         summarise("Total Signed Contributions"=sum(`Net Signed Condribution in USD`) %>% dollar(),
                   "Total Received Contributions"=sum(`Net Paid-In Condribution in USD`) %>% dollar(),
@@ -836,13 +854,21 @@ server <- shinyServer(function(input,output,session) {
     reactive_active_trustee <- reactive({
     
       active_trustee %>%
-        filter(temp.name == input$select_trustee)
+        filter(temp.name %in% input$select_trustee)
     })
     
     reactive_grants_trustee <- reactive({
+      
+      if(!is.null(input$trustee_select_region)){
+      
       grants %>%
-        filter(temp.name == input$select_trustee) %>% 
-        filter(Region %in% input$trustee_select_region)
+        filter(temp.name %in% input$select_trustee) %>% 
+        filter(Region %in% all_fun(input$trustee_select_region,Region))}
+      
+      else{
+        grants %>%
+          filter(temp.name %in% input$select_trustee)
+      }
       
     })
     
@@ -851,10 +877,13 @@ server <- shinyServer(function(input,output,session) {
       temp_grants <- grants %>% filter(temp.name == input$select_trustee)
       temp_active_trustee <- active_trustee %>% filter(temp.name==input$select_trustee)
       
-      updateSelectInput(session, "trustee_select_region",
-                        label = 'Selected Regions',
+      updateCheckboxGroupButtons(session,inputId =  "trustee_select_region",
+                        label = 'Filter Regions:',
                         choices = sort(unique(temp_grants$Region)),
-                        selected = unique(temp_grants$Region))
+                        status = "primary",
+                        size='sm',
+                        checkIcon = list(yes = icon("ok", lib = "glyphicon"),
+                                         no = icon("remove", lib = "glyphicon")))
       
       output$trustee_contribution_agency <- renderText({
         temp_active_trustee$`Donor Agency Name`
@@ -865,10 +894,14 @@ server <- shinyServer(function(input,output,session) {
         #subset the data by trustee selected
         temp_grants <- grants %>% filter(temp.name == input$select_trustee)
         
-        updateSelectInput(session, "trustee_select_region",
-                          label = 'Selected Regions',
+        updateCheckboxGroupButtons(session,
+                                   "trustee_select_region",
+                          label = 'Filter Regions:',
                           choices = sort(unique(temp_grants$Region)),
-                          selected = unique(temp_grants$Region))
+                          status = "primary",
+                          size="sm",
+                          checkIcon = list(yes = icon("ok", lib = "glyphicon"),
+                                           no = icon("remove", lib = "glyphicon")))
       }
       })
         output$trustee_contribution_agency <- renderText({
@@ -1235,7 +1268,8 @@ server <- shinyServer(function(input,output,session) {
           filter(Region %in% input$focal_select_region) %>% 
           filter(temp.name %in% input$focal_select_trustee) %>% 
         filter(`DF Execution Type` %in% input$region_BE_RE) %>%
-        filter(PMA.2 %in% input$region_PMA_or_not)
+        filter(PMA.2 %in% input$region_PMA_or_not) %>% 
+        filter(closing_FY %in% input$closing_fy)
     })
       
     reactive_df_2 <- reactive({
@@ -1335,9 +1369,7 @@ server <- shinyServer(function(input,output,session) {
     
     output$date_data_updated_message <- renderMenu({
       dropdownMenu(type="notifications",
-                   notificationItem(text = paste("Dashboard data as of:",
-                                                 as.character(date_data_udpated),
-                                                 "(ymd)"),
+                   notificationItem(text = paste("Data updated as of:", report_data_date),
                                     icon=icon("calendar")),
                    icon = icon("calendar"))
     })
@@ -3168,6 +3200,7 @@ server <- shinyServer(function(input,output,session) {
           filename = function() {
             paste("Summary Report",".xlsx", sep="")},
           content = function(file) {
+            withProgress(message='Analyzing data and creating report, this may take a minute or two...',{
             openxlsx::saveWorkbook({
               
               
@@ -3357,7 +3390,7 @@ server <- shinyServer(function(input,output,session) {
               
               wb
               
-            },file,overwrite = TRUE)
+            },file,overwrite = TRUE)})
           })
         
         
@@ -3370,6 +3403,8 @@ server <- shinyServer(function(input,output,session) {
               paste("Risk Report_",input$risk_region,"_region",".xlsx", sep="")
             },
             content = function(file) {
+              
+               withProgress(message='Analyzing data and creating report, this may take a minute or two...',{
               openxlsx::saveWorkbook({
                 
                 data_date <- date_data_udpated
@@ -3764,7 +3799,7 @@ server <- shinyServer(function(input,output,session) {
 
                 wb
                 
-              },file,overwrite = TRUE)
+              },file,overwrite = TRUE) })
               
          
 
@@ -3773,17 +3808,20 @@ server <- shinyServer(function(input,output,session) {
    ### DOWNLOAD MASTER REPORT    -------------  
         
         output$Download_master_report.xlsx <- 
-          downloadHandler(
+         downloadHandler(
             filename = function() {
               paste("Master Report_as_of_",date_data_udpated,".xlsx", sep="")
             },
             content = function(file) {
-              openxlsx::saveWorkbook({
+              
+              withProgress(message='Analyzing data and creating report',
+                           detail="this may take a minute or two",{
+                             openxlsx::saveWorkbook({
                 
                 source("Sameh_Report.R")
                 wb
                 
-          },file,overwrite = TRUE)
+          },file,overwrite = TRUE)})
           })
         
         ### CODE NOT BEING USED   -------------     

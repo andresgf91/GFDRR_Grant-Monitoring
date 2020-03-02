@@ -10,17 +10,22 @@ options(scipen = 999)
 #NEEDS UPDATING
 
 #grants_file <- "GFDRR Dashboard grant level 12_3_19.xlsx"
-grants_file <- "GFDRR Grant Level Dashboard Data 1_27_2020.xlsx"
+#grants_file <- "GFDRR Grant Level Dashboard Data 1_27_2020.xlsx"
+
+grants_file <- "GFDRR Grant Level Raw Data Sara 2_13_20.xlsx"
 
 #sap <- read_xlsx('SAP Data as of June 30_2019.xlsx')
 grants <- read_xlsx(grants_file)
 date_data_udpated <- lubridate::mdy(stri_sub(grants_file,from = -15,-6))
 
-report_data_date <- "January 13, 2020"
+report_data_date <- paste0(month(date_data_udpated,abbr = FALSE,label = TRUE),
+                           " ", day(date_data_udpated),
+                           ", ",
+                           year(date_data_udpated))
 
 
 #trustee <- read_xlsx('GFDRR Trustee level 12_2_19.xlsx')
-trustee <- read_xlsx("GFDRR Trustee Level Dashboard Data 1_29_20.xlsx")
+trustee <- read_xlsx("GFDRR Trustee Level Raw Data Sara 2_13_2020.xlsx")
 recode_trustee <- read_xlsx('recodes.xlsx',sheet=1)
 recode_region <- read_xlsx('recodes.xlsx',sheet=2)
 recode_GT <- read_xlsx("Global Theme - Resp. Unit Mapping.xlsx")
@@ -28,11 +33,39 @@ SR_grant_details <- read_xlsx("Trust_Fund_Breakdown_Table_TF4.1 Grant Details Re
 
 
 
+remove_periods_from_names <- function(df){
+  names_with_dots <- sum(stri_detect_fixed(names(df),"."))
+  
+  if (names_with_dots > 0) {
+    names(df) <- stri_replace_all_fixed(names(df),"."," ")
+  }
+  
+  df
+}
+
+
+
+grants <- remove_periods_from_names(grants)
+
 #rename_grants in GRANTS 
 
 if (!is.null(grants$`Lead GP/Global Theme`)){
   grants <- grants %>% dplyr::rename("Lead GP/Global Themes"=`Lead GP/Global Theme`)
 }
+
+if (!is.null(trustee$`Contribution Agreement Signed (Ledger) U...19`)){
+  trustee <- trustee%>% dplyr::rename("Net Signed Condribution in USD"=`Contribution Agreement Signed (Ledger) U...19`)
+}
+if (!is.null(trustee$`Contribution Cash received (ledger) USD`)){
+  trustee <- trustee %>% dplyr::rename("Net Paid-In Condribution in USD"=`Contribution Cash received (ledger) USD`)
+}
+if (!is.null(trustee$`Contribution Agreement Signed (Ledger) U...21`)){
+  trustee <- trustee %>% dplyr::rename("Net Unpaid contribution in USD"=`Contribution Agreement Signed (Ledger) U...21`)
+}
+
+
+
+
 #EXPENSES DATA FOR PMA ----------
 expenses <- read.csv(file='V2_GFDRR TF Expense Details - FY18 and FY19 YTD(AutoRecovered).csv',
                      stringsAsFactors = FALSE,col.names =  c("Disbursing.Trust.Fund",
@@ -67,7 +100,7 @@ grants$`Lead GP/Global Themes`[which(grants$`Lead GP/Global Themes`=="Climate Ch
 
 #create a new df with only active trustees and with recoded names
 trustee$still_days_to_disburse <- as.Date(trustee$`TF End Disb Date`) > today()
-active_trustee <- trustee %>% filter(still_days_to_disburse==TRUE)
+active_trustee <- trustee %>% filter(still_days_to_disburse == TRUE)
 
 active_trustee <- left_join(active_trustee,recode_trustee,by=c("Fund"="Trustee")) %>%
   rename("Trustee.name"=`Trustee Fund Name`)
@@ -76,7 +109,7 @@ active_trustee <- left_join(active_trustee,recode_trustee,by=c("Fund"="Trustee")
 grants <- full_join(grants,recode_region,by=c("Fund Country Region Name"='Region_Name'))
 
 #filter out grants that have 0 or that are not considered "Active" as per GFDRR definition which includes PEND
-grants <- grants %>% filter(`Grant Amount USD`>0)
+
 grants <- grants %>% filter(`Fund Status` %in% c("ACTV","PEND"))
 
 
@@ -109,6 +142,8 @@ for (i in 1:nrow(active_trustee)){
   {active_trustee$temp.name[i] <- active_trustee$Trustee.name[i]}
 }
 
+
+
 elapsed_months <- function(end_date, start_date) {
   ed <- as.POSIXlt(end_date)
   sd <- as.POSIXlt(start_date)
@@ -131,11 +166,24 @@ grants$months_to_end_disbursement_static <-
 
 
 # add a column with Trustee temporary name V
-grants <- full_join(grants,active_trustee %>%
+grants <- left_join(grants,active_trustee %>%
                    filter(Fund %in% trustee$Fund) %>% 
                    select(temp.name,Fund),
                  by = c("Trustee"="Fund")) %>%
   filter(!is.na(Fund))
+
+
+if(length(which(is.na(grants$temp.name)))>0){
+  nameless <- unique(grants$Trustee[which(is.na(grants$temp.name))])
+  
+  for (i in nameless){
+    
+    if(i %in% recode_trustee$Trustee){
+    grants$temp.name[grants$Trustee==i] <- recode_trustee$`Trustee Fund Name`[recode_trustee$Trustee==i]
+      }
+    }
+  
+}
 
 grants$closing_FY <- ifelse(month(grants$`Closing Date`) > 6,
                          year(grants$`Closing Date`) + 1,
@@ -222,10 +270,12 @@ grants$PMA <- ifelse(is.na(grants$`Project ID`),'yes','no')
 #remove_just-in-time from PMA 
 grants$PMA <- ifelse(stringi::stri_detect(tolower(grants$`Fund Name`),
                                           fixed=tolower('Just-in-Time')),
-                     'no',
+                     'yes',
                      grants$PMA)
 
-PMA_grants <- grants %>% filter(PMA=='yes',`Fund Status`=="ACTV")
+
+
+PMA_grants <- grants %>% filter(PMA=='yes',`Fund Status` %in% c("ACTV","PEND"),`Grant Amount USD`>0)
 
 PMA_expenses <- expenses %>% filter(Disbursing.Trust.Fund %in% PMA_grants$Fund)
 
@@ -237,8 +287,9 @@ first_date <- as_date(date_data_udpated) %>% floor_date(unit = "months")
 
 for (i in 1:nrow(PMA_grants)){
   
+  print(i)
   temp_max_months <- PMA_grants$months_to_end_disbursement_static[i]
-  temp_max_months <- ifelse(temp_max_months==0,1,temp_max_months)
+  temp_max_months <- ifelse(temp_max_months<=0,1,temp_max_months)
   monthly_allocation <- (PMA_grants$unnacounted_amount[i])/(ifelse(temp_max_months>0,
                                                                    temp_max_months,
                                                                    1))
@@ -302,12 +353,34 @@ grants$PMA.2 <- ifelse(grants$PMA=="yes","PMA","Operational")
 grants <- grants %>% mutate(GPURL_binary = ifelse(`Lead GP/Global Themes`=="Urban, Resilience and Land",
                                "GPURL",
                                "Non-GPURL"))
+
+grants$GPURL_binary[is.na(grants$GPURL_binary)] <- "Non-GPURL"
  
-grants$region_color <- factor(grants$Region, labels = RColorBrewer::brewer.pal(length(unique(grants$Region)), name = "Set3"))
+#grants$region_color <- factor(grants$Region,
+                            #  labels = RColorBrewer::brewer.pal(length(unique(grants$Region)),
+                                                           #     name = "Set3"))
+
+
+regions_col_df <- data.frame(Region=c("LCR",
+                                      "AFR",
+                                      "GLOBAL",
+                                      "EAP",
+                                      "SAR",
+                                      "ECA",
+                                      "MNA"),
+                             region_color=c("#f8a65b",
+                                            "#f37960",
+                                            "#adbac1",
+                                            "#3487aa",
+                                            "#57b6d0",
+                                            "#96b263",
+                                            "#be8cb0"),stringsAsFactors = F)
+
+
+grants <- left_join(grants,regions_col_df,by="Region")
+
 
 ## REPORT PRODUCTION DATA PRE-PROCESSING 
-
-
 report_grants <- grants %>% rename("Child Fund" = Fund,
                                    "Child Fund Name" = `Fund Name`,
                                    "Child Fund Status" = `Fund Status`,
@@ -322,15 +395,31 @@ report_grants <- grants %>% rename("Child Fund" = Fund,
                                    "Execution Type"=`DF Execution Type`)
 
 
-
-report_grants$`Months to Closing Date` <- as.numeric(round(
+  report_grants$`Months to Closing Date` <- as.numeric(floor(
   (difftime(
-    strptime(report_grants$`Closing Date`, format = "%Y-%m-%d"),
-    strptime(date_data_udpated, format = "%Y-%m-%d"),
+    strptime(report_grants$`Closing Date`, format = "%Y-%m-%d",tz = "GMT"),
+    strptime(date_data_udpated, format = "%Y-%m-%d",tz="GMT"),
     units="days")
-  )/30,digits = 1))
+  )/(365.25/12)))
   
+  
+report_grants$`Months to Closing Date` <- ifelse(report_grants$`Months to Closing Date`==0,
+                                                 1,
+                                                 report_grants$`Months to Closing Date`)
   
 report_grants$`Uncommitted Balance` <-  report_grants$`Grant Amount` -
   (report_grants$`Cumulative Disbursements` + report_grants$`PO Commitments`)
+
+grants <- grants %>% filter(`Grant Amount USD`>0)
+
+
+all_fun <- function(INPUT,CHOICES){
+  if (INPUT == "ALL"){
+    
+    return(CHOICES)}
+  else{
+    
+    return(INPUT)}
+  
+}
   

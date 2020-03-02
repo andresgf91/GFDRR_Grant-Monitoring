@@ -37,11 +37,19 @@ library(shinyjs)
 # BUILD USER INTERFACE ----------------------------------------------------
 
 ## Header ---------------
-Header <- dashboardHeaderPlus(
+Header <- dashboardHeaderPlus(title=
+                                #tags$a(tags$img(src='GFDRR_BW_logo.png',height='45',width='190'))
+                                
+                                
+                                tagList(
+  span(class="logo-lg",'SARA'), 
+  span(class = "logo-mini","SARA "))
+  ,
                           dropdownMenuOutput("date_data_updated_message"),
                          # disable = F,
                           enable_rightsidebar = TRUE,
-                          rightSidebarIcon = "gears"
+                          rightSidebarIcon = "gears",
+  left_menu =  tagList(img(class="logo-lg",src='GFDRR_BW_logo.png',height='45',width='190'))
 )
 ## Sidebar ---------------
 
@@ -94,7 +102,7 @@ Sidebar <- dashboardSidebar(#collapsed = TRUE,
 ## tab.1 (Overview)---------------
 tab.1 <-  tabItem(tabName = "overview",
                     theme = shinytheme("readable"),
-                    titlePanel('Global Overview'),
+                     titlePanel('Global Overview'),
                     fluidRow(
                       column(
                         width = 2,
@@ -176,7 +184,7 @@ tab.1 <-  tabItem(tabName = "overview",
                     
                   
 
-# tab 1.3 ------
+# tab 1.3 (additional info)------
 tab.1.3 <-  tabItem(tabName = "admin_info",
                       titlePanel('Additional Information'),
                       tabsetPanel(
@@ -603,7 +611,14 @@ Body <- dashboardBody(tags$head(tags$style(HTML('
     .small-box {height: 150px}
     
     .wrapper{
-    overflow-y: hidden;}
+    overflow-y: hidden;
+
+
+
+
+
+
+}
 
   '))),tabItems(tab.1,tab.3,tab.2,tab.1.3,tab.reports))
                 #tab.2,tab.3,PMA.tab,tab.1.3,tab.5,tab.6))
@@ -658,7 +673,7 @@ ray.of.sunshine <- rightSidebar(
 )
 
 # UI ------
-ui <- dashboardPagePlus(collapse_sidebar = TRUE,
+ui <- dashboardPagePlus(collapse_sidebar = FALSE,
                         useShinyjs(),
                         header = Header,
                         sidebar = Sidebar,

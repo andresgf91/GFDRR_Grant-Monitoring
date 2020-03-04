@@ -158,6 +158,16 @@ active_trustee$months_to_end_disbursement <-
 active_trustee$months_to_end_disbursement_static <- 
   elapsed_months(active_trustee$`TF End Disb Date`,date_data_udpated)
 
+
+
+
+
+active_trustee$`Donor Agency Name` <- tools::toTitleCase(tolower(active_trustee$`Donor Agency Name`))
+
+active_trustee$`Donor Agency Name` <- ifelse(active_trustee$`Donor Agency Name`=='Multi Donor',
+                                             "Multiple Donors",
+                                             active_trustee$`Donor Agency Name`)
+
 grants$months_to_end_disbursement <- 
   elapsed_months(grants$`Closing Date`,today())
 
@@ -218,7 +228,7 @@ grants$burn_rate <- (grants$`Disbursements USD`/ grants$tf_age_months)
 grants$percent_remaining <- grants$remaining_balance/grants$`Grant Amount USD`
 
 grants$required_disbursement_rate <- (grants$unnacounted_amount/grants$`Grant Amount USD`)/
-  grants$months_to_end_disbursement
+  (ifelse(grants$months_to_end_disbursement!=0,grants$months_to_end_disbursement,1))
 
 grants$required_disbursement_rate <- ifelse(grants$required_disbursement_rate==Inf,
                                       grants$percent_unaccounted/100,

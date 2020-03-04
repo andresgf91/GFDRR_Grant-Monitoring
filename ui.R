@@ -29,11 +29,6 @@ library(DT)
 library(shinythemes)
 library(shinyjs)
 
-#source("data_import.R")
-#source('Data_processing.R')
-#source("Plots.R")
-
-
 # BUILD USER INTERFACE ----------------------------------------------------
 
 ## Header ---------------
@@ -114,7 +109,8 @@ tab.1 <-  tabItem(tabName = "overview",
                       column(
                         width = 4,
                        
-                        boxPlus(plotlyOutput("funding_region", height = "260px"),
+                        boxPlus(
+                          plotlyOutput("funding_region", height = "260px"),
                                 title='Funding by Region',
                                 background = "blue",
                                 enable_label = T,
@@ -123,7 +119,8 @@ tab.1 <-  tabItem(tabName = "overview",
                                 collapsible = TRUE,
                                 closable = F,
                                 collapsed = F),
-                        boxPlus(plotlyOutput("funding_GP", height = "260px"),
+                        boxPlus(
+                          plotlyOutput("funding_GP", height = "260px"),
                                 title='Funding by Global Practice',
                                 background = "blue",
                                 enable_label = T,
@@ -157,8 +154,9 @@ tab.1 <-  tabItem(tabName = "overview",
                                 collapsible = TRUE,
                                 closable = F),
                         boxPlus(
-                          plotlyOutput("plot1",height = "600px"),
-                                title="Contributions by Trustee",
+                          plotlyOutput("plot1",
+                                       height = "600px"),
+                                title = "Contributions by Trustee",
                                 width = NULL,
                           background = "blue",
                           enable_label = T,
@@ -213,24 +211,24 @@ tab.1.3 <-  tabItem(tabName = "admin_info",
                     )
 
 ## tab.2 (Parent Trustfund View) ----------------------
-tab.2 <- tabItem(tabName= "parent_tf",
+tab.2 <- tabItem(tabName= "parent_tf",fluidPage(
                  titlePanel("Parent Trust Fund View"),
                            fluidRow(
                    column(width=3,
-                 boxPlus(
+                 boxPlus(title = "", closable = F,enable_label = T,label_text = 'Parent Fund(s)',
                      textOutput('trustee_name'),
                      width=NULL,background = "navy")),
                  column(width=9,
-                 boxPlus(
+                 boxPlus(title = "", closable = F,enable_label = T,label_text = 'Donor Agencies',
                      textOutput('trustee_contribution_agency'),
                      width = 6,background = 'navy'),
-                 boxPlus(
+                 boxPlus(title = "", closable = F,enable_label = T,label_text = 'TTL(s)',
                      textOutput('TTL_name'),
                      width = 6,
                      background = "navy"))),
                  fluidRow(
                    column(width=3,
-                 valueBoxOutput("fund_contributions",width = NULL),
+                 valueBoxOutput("fund_contributions", width = NULL),
                  valueBoxOutput("trustee_closing_in_months",width = NULL),
                  valueBoxOutput("trustee_active_grants",width = NULL),
                  valueBoxOutput("trustee_grants_closing_3",width = NULL)
@@ -283,7 +281,7 @@ tab.2 <- tabItem(tabName= "parent_tf",
                    closable = F,
                    collapsed = T)
                  
-                 )
+                 ))
 )
                         
                         
@@ -348,7 +346,7 @@ tab.3 <-  tabItem(tabName = "regions",
                             
                         boxPlus(
                           plotlyOutput(outputId = "focal_region_n_grants_GG",
-                                       height="400px"),
+                                       height="420px"),
                           title='Active Grants by Trustee',
                           background = "light-blue",
                           enable_label = T,
@@ -599,7 +597,8 @@ tab.reports <- tabItem(
 
 
 ## BODY ---------------
-Body <- dashboardBody(tags$head(tags$style(HTML('
+Body <- dashboardBody(
+tags$head(tags$style(HTML('
   .navbar-custom-menu>.navbar-nav>li>.dropdown-menu {
   width:600px;
   }
@@ -616,12 +615,11 @@ Body <- dashboardBody(tags$head(tags$style(HTML('
 
 
 
-
-
 }
 
-  '))),tabItems(tab.1,tab.3,tab.2,tab.1.3,tab.reports))
-                #tab.2,tab.3,PMA.tab,tab.1.3,tab.5,tab.6))
+  '))),
+tabItems(tab.1,tab.3,tab.2,tab.1.3,tab.reports))
+#tab.2,tab.3,PMA.tab,tab.1.3,tab.5,tab.6))
 
 # RAY OF SUNSHINE --------------
 ray.of.sunshine <- rightSidebar(
@@ -673,7 +671,7 @@ ray.of.sunshine <- rightSidebar(
 )
 
 # UI ------
-ui <- dashboardPagePlus(collapse_sidebar = FALSE,
+ui <- dashboardPagePlus(collapse_sidebar = T,
                         useShinyjs(),
                         header = Header,
                         sidebar = Sidebar,

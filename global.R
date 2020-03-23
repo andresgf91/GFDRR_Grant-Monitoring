@@ -11,8 +11,12 @@ options(scipen = 999)
 
 #grants_file <- "GFDRR Dashboard grant level 12_3_19.xlsx"
 #grants_file <- "GFDRR Grant Level Dashboard Data 1_27_2020.xlsx"
+#grants_file <- "GFDRR Grant Level Raw Data Sara 2_13_20.xlsx"
 
-grants_file <- "GFDRR Grant Level Raw Data Sara 2_13_20.xlsx"
+grants_file <- "data/GFDRR Grant Level Sara Data 3_4_2020.xlsx"
+
+#trustee_file <- "GFDRR Trustee Level Raw Data Sara 2_13_2020.xlsx"
+trustee_file <- "data/GFDRR Trustee Level Sara Data 3_4_2020.xlsx"
 
 #sap <- read_xlsx('SAP Data as of June 30_2019.xlsx')
 grants <- read_xlsx(grants_file)
@@ -23,9 +27,12 @@ report_data_date <- paste0(month(date_data_udpated,abbr = FALSE,label = TRUE),
                            ", ",
                            year(date_data_udpated))
 
+#fp_raw_data <- read_xlsx(path = "data/GFDRR Raw Data 2_13_2020.xlsx",sheet = 2,skip = 6)
+fp_raw_data <- read_xlsx(path = "data/FP_GFDRR Raw Data 3_4_2020.xlsx",sheet = 2,skip = 6)
+
 
 #trustee <- read_xlsx('GFDRR Trustee level 12_2_19.xlsx')
-trustee <- read_xlsx("GFDRR Trustee Level Raw Data Sara 2_13_2020.xlsx")
+trustee <- read_xlsx(trustee_file)
 recode_trustee <- read_xlsx('recodes.xlsx',sheet=1)
 recode_region <- read_xlsx('recodes.xlsx',sheet=2)
 recode_GT <- read_xlsx("Global Theme - Resp. Unit Mapping.xlsx")
@@ -47,6 +54,10 @@ remove_periods_from_names <- function(df){
 
 grants <- remove_periods_from_names(grants)
 
+
+swedish_grants_to_remove <- c("TF070808","TF080129")
+
+
 #rename_grants in GRANTS 
 
 if (!is.null(grants$`Lead GP/Global Theme`)){
@@ -64,7 +75,7 @@ if (!is.null(trustee$`Contribution Agreement Signed (Ledger) U...21`)){
 }
 
 
-
+grants <- grants %>% filter(!(Fund %in% swedish_grants_to_remove))
 
 #EXPENSES DATA FOR PMA ----------
 expenses <- read.csv(file='V2_GFDRR TF Expense Details - FY18 and FY19 YTD(AutoRecovered).csv',
@@ -99,7 +110,7 @@ grants$`Lead GP/Global Themes`[which(grants$`Lead GP/Global Themes`=="Climate Ch
 
 
 #create a new df with only active trustees and with recoded names
-trustee$still_days_to_disburse <- as.Date(trustee$`TF End Disb Date`) > today()
+trustee$still_days_to_disburse <- as.Date(trustee$`TF End Disb Date`) > as.Date(date_data_udpated)
 active_trustee <- trustee %>% filter(still_days_to_disburse == TRUE)
 
 active_trustee <- left_join(active_trustee,recode_trustee,by=c("Fund"="Trustee")) %>%
@@ -109,6 +120,8 @@ active_trustee <- left_join(active_trustee,recode_trustee,by=c("Fund"="Trustee")
 grants <- full_join(grants,recode_region,by=c("Fund Country Region Name"='Region_Name'))
 
 #filter out grants that have 0 or that are not considered "Active" as per GFDRR definition which includes PEND
+
+all_grants <- grants
 
 grants <- grants %>% filter(`Fund Status` %in% c("ACTV","PEND"))
 
@@ -157,8 +170,6 @@ active_trustee$months_to_end_disbursement <-
 
 active_trustee$months_to_end_disbursement_static <- 
   elapsed_months(active_trustee$`TF End Disb Date`,date_data_udpated)
-
-
 
 
 
@@ -236,9 +247,9 @@ grants$required_disbursement_rate <- ifelse(grants$required_disbursement_rate==I
 
 compute_risk_level <- function (x){
   
-  risk_level <- ifelse(x < .03,"Low Risk",
-                       ifelse(x < .05,"Medium Risk",
-                       ifelse(x < .10,"High Risk",
+  risk_level <- ifelse(x < .025,"Low Risk",
+                       ifelse(x < .055,"Medium Risk",
+                       ifelse(x < .105,"High Risk",
                        "Very High Risk")))
   
   return(risk_level)
@@ -249,9 +260,9 @@ grants$disbursement_risk_level <- compute_risk_level(grants$required_disbursemen
 
 compute_risk_color<- function (x){
   
-  risk_color <- ifelse(x<.03,"green",
-                       ifelse(x<.05,"yellow",
-                              ifelse(x<.10,"orange",
+  risk_color <- ifelse(x<.025,"green",
+                       ifelse(x<.055,"yellow",
+                              ifelse(x<.105,"orange",
                                      "red")))
   
   return(risk_color)
@@ -276,14 +287,14 @@ grants$percent_left_to_transfer <- grants$funds_to_be_transferred/grants$`Grant 
 #step 1
 grants$PMA <- ifelse(is.na(grants$`Project ID`),'yes','no')
 
+grants$PMA[grants$Fund=="TF018938"] <- 'no'
+
 #step 2
 #remove_just-in-time from PMA 
-grants$PMA <- ifelse(stringi::stri_detect(tolower(grants$`Fund Name`),
-                                          fixed=tolower('Just-in-Time')),
-                     'yes',
-                     grants$PMA)
-
-
+#grants$PMA <- ifelse(stringi::stri_detect(tolower(grants$`Fund Name`),
+                   ##                       fixed=tolower('Just-in-Time')),
+                   #  'yes',
+                   #  grants$PMA)
 
 PMA_grants <- grants %>% filter(PMA=='yes',`Fund Status` %in% c("ACTV","PEND"),`Grant Amount USD`>0)
 
@@ -390,6 +401,7 @@ regions_col_df <- data.frame(Region=c("LCR",
 grants <- left_join(grants,regions_col_df,by="Region")
 
 
+grants$unnacounted_amount[grants$`Fund Status`=='PEND'] <- 0
 ## REPORT PRODUCTION DATA PRE-PROCESSING 
 report_grants <- grants %>% rename("Child Fund" = Fund,
                                    "Child Fund Name" = `Fund Name`,
@@ -412,15 +424,23 @@ report_grants <- grants %>% rename("Child Fund" = Fund,
     units="days")
   )/(365.25/12)))
   
+
   
-report_grants$`Months to Closing Date` <- ifelse(report_grants$`Months to Closing Date`==0,
+  
+report_grants$`Months to Closing Date` <- ifelse(report_grants$`Months to Closing Date`== 0,
                                                  1,
                                                  report_grants$`Months to Closing Date`)
   
 report_grants$`Uncommitted Balance` <-  report_grants$`Grant Amount` -
   (report_grants$`Cumulative Disbursements` + report_grants$`PO Commitments`)
 
-grants <- grants %>% filter(`Grant Amount USD`>0)
+
+report_grants$`Uncommitted Balance`[report_grants$`Child Fund Status`=='PEND'] <- 0
+
+
+report_grants <- report_grants %>% filter(`Child Fund`!="TF0B2168")
+
+grants <- grants %>% filter(`Grant Amount USD` > 0)
 
 
 all_fun <- function(INPUT,CHOICES){
@@ -432,4 +452,5 @@ all_fun <- function(INPUT,CHOICES){
     return(INPUT)}
   
 }
-  
+
+

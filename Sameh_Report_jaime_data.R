@@ -13,48 +13,79 @@ current_trustee_subset <- active_trustee %>%
 
 as.of.date <- date_data_udpated
 
-data <- report_grants 
+crews_data <- report_grants %>% filter(PMA=='no')
+
+crews_data <- crews_data %>% rename("Window #" =`Window Number`,
+                                          "Trustee #" = Trustee,
+                                          "Child Fund #" = `Child Fund`,
+                                          "Lead GP/Global Theme" = `Lead GP/Global Themes`,
+                                          "Managing Unit" = `Managing Unit Name`,
+                                          "2020 Disbursements" = `2020 Disbursement USD`,
+                                          "Remaining Available Balance" = remaining_balance,
+                                          "Required Monthly Disbursement Rate =(Remaining/GrantAmount)/MonthClosing" = required_disbursement_rate) %>% 
+  dplyr::mutate("Real Transfers in" = `Transfer-in USD` - `Transfers-out in USD`) %>% 
+  dplyr::mutate("Not Yet Transferred" = `Grant Amount` - `Real Transfers in`)
+
+crews_data <- crews_data %>% mutate(`Window #` = as.numeric(`Window #`))
+
+data <- read_xlsx(path = "data/FP_GFDRR Raw Data 3_4_2020.xlsx", sheet = 2, skip = 6)
+
+data <- data %>% mutate(`TTL Unit`= as.character(`TTL Unit`),
+                        `Required Monthly Disbursement Rate =(Remaining/GrantAmount)/MonthClosing` =
+                          as.numeric(`Required Monthly Disbursement Rate =(Remaining/GrantAmount)/MonthClosing`))
+
+crews_data <- crews_data %>% select(unique(names(data))) %>% filter(!(`Child Fund #` %in% data$`Child Fund #`))
+
+
+
+data <- dplyr::union(data,crews_data)
+
+data$`Remaining Available Balance` <- data$`Grant Amount`- (data$`Cumulative Disbursements` + data$`PO Commitments`)
+
+closed <- which(data$`Required Monthly Disbursement Rate =(Remaining/GrantAmount)/MonthClosing`=='Closed')
+data$`Required Monthly Disbursement Rate =(Remaining/GrantAmount)/MonthClosing` <- (data$`Remaining Available Balance`/data$`Grant Amount`)/data$`Months to Closing Date`
+
+closed <- which(data$`Months to Closing Date`<1)
+
+data$`Required Monthly Disbursement Rate =(Remaining/GrantAmount)/MonthClosing`[closed] <- "Closed"
+
 
 region <- 'ALL regions'
 
 message(paste("Preparing report for",region))
 
 
-funding_sources <- active_trustee$temp.name %>% 
+wb <- createWorkbook()
+
+funding_sources <- active_trustee$temp.name %>% #changeeeeee!
   unique() %>%
   paste(sep = "",collapse= "; ")
 
-current_trustee_subset_collapsed <- sort(current_trustee_subset$temp.name) %>%
+current_trustee_subset_collapsed <- sort(current_trustee_subset$temp.name)%>% #changeeeeee!
   unique() %>%
   paste(sep = "",collapse= "; ")
 
-df <- data %>% filter(PMA=='no')
 
-df <- dplyr::left_join(df,jaime_df)
-
-df <- {df %>%  select(`Closing FY`,
-                     Trustee,
-                     `Trustee Fund Name`,
-                     `Child Fund`,
+df <- data %>%  select(`Closing FY`,`Trustee #`, 
+                     `Child Fund #`,
+                     `Project ID`,
                      `Child Fund Name`,
                      `Child Fund Status`,
-                     `Project ID`,
                      `Execution Type`,
                      `Child Fund TTL Name`,
-                     `Managing Unit Name`,
-                     `Lead GP/Global Themes`,
+                     `Managing Unit`,
+                     `Lead GP/Global Theme`,
                      Country,
+                     `Region Name`,
                      `Activation Date`,
                      `Closing Date`,
                      `Grant Amount`,
                      `Cumulative Disbursements`,
                      `PO Commitments`,
-                     `Uncommitted Balance`,
+                     `Remaining Available Balance`,
                      `Months to Closing Date`,
-                     GPURL_binary,
-                     `Region Name`)} #select only relevant columns
+                     `Required Monthly Disbursement Rate =(Remaining/GrantAmount)/MonthClosing`)
 
-#df <- df %>% filter(`Uncommitted Balance`>0)
 
 elapsed_months <- function(end_date, start_date) {
   ed <- as.POSIXlt(end_date)
@@ -64,19 +95,26 @@ elapsed_months <- function(end_date, start_date) {
 
 #df$`Child Fund Months Active` <-  elapsed_months(data_date,df$`Activation Date`)
 
-df$`Uncommitted Balance (Percent)` <- df$`Uncommitted Balance`/df$`Grant Amount`
+df$`Uncommitted Balance (Percent)` <- df$`Remaining Available Balance`/df$`Grant Amount`
 
-
-df$`Required Monthly Disbursement Rate` <- (df$`Uncommitted Balance` /df$`Grant Amount`)/
-  (ifelse(df$`Months to Closing Date`>=1,df$`Months to Closing Date`,1))
+df <- df %>% rename("Required Monthly Disbursement Rate" =
+                `Required Monthly Disbursement Rate =(Remaining/GrantAmount)/MonthClosing`)
+  
+  
+  
+df$`Required Monthly Disbursement Rate` <- ifelse(df$`Required Monthly Disbursement Rate`=='Closed',
+                                                999,
+                                                as.numeric(df$`Required Monthly Disbursement Rate`))
 
 
 compute_risk_level <- function (x){
   
-  risk_level <- ifelse(x < .025,"Low Risk",
+  risk_level <- ifelse(x == 999, "Closed (Grace Period)",
+    ifelse(x < .025,"Low Risk",
                        ifelse(x < .055,"Medium Risk",
                               ifelse(x < .105,"High Risk",
-                                     "Very High Risk")))
+                                     "Very High Risk"))))
+  
   return(risk_level)
 }
 
@@ -85,60 +123,58 @@ compute_risk_level <- function (x){
 df$`Disbursement Risk Level` <- compute_risk_level(as.numeric(df$`Required Monthly Disbursement Rate`))
 
 
-df$`Grace Period` <- ifelse(df$`Months to Closing Date`<0,
+df$`Grace Period` <- ifelse(df$`Disbursement Risk Level`=="Closed (Grace Period)",
                             "Yes",
                             "No")
 
-if (!is.null(df$`Child Fund`=='TF0B2168')){
+#if (!is.null(df$`Child Fund`=='TF0B2168')){
   
-df$`Grace Period`[df$`Child Fund`=='TF0B2168'] <- "Yes"}
-
-df$`Disbursement Risk Level`[df$`Grace Period`=="Yes"] <- "Closed (Grace Period)"
+#df$`Grace Period`[df$`Child Fund`=='TF0B2168'] <- "Yes"}
 
 #df$`Disbursement Risk Level`[459] <- "Closed (Grace Period)"
 
 df <- df %>%
-  arrange(match(`Disbursement Risk Level`, c("Closed (Grace Period)", "Low Risk", "Medium Risk", "High Risk", "Very High Risk")))
+  arrange(match(`Disbursement Risk Level`, c("Closed (Grace Period)","Very High Risk","High Risk","Medium Risk", "Low Risk" )))
 
 
 #df <- df %>% arrange(abs(as.numeric(`Required Monthly Disbursement Rate`)))
 
+df <- left_join(df,recode_trustee,
+                    by = c("Trustee #"="Trustee"))
 
+df$funding_sources <- paste0(df$`Trustee Fund Name`," (",df$`Trustee #`,")")
 
-df$grace_period_divider <- ifelse((4 + df$`Months to Closing Date`)>=1,
-                                  (4 + df$`Months to Closing Date`),
-                                  1)
-df$`Required Monthly Disbursement Rate` <- ifelse(df$`Months to Closing Date`<0,
-                                                  (df$`Uncommitted Balance (Percent)`/df$grace_period_divider),
-                                                  df$`Required Monthly Disbursement Rate`)
-
-df <- df %>% select(-grace_period_divider)
-
-df$funding_sources <- paste0(df$`Trustee Fund Name`," (",df$Trustee,")")
-
+# names_trustee_subset <- left_join(as.data.frame(trustee_subset),
+#   recode_trustee.2,by=c("trustee_subset"="Trustee")) %>%
+# mutate(name_number = paste0(`Trustee Fund Name`," (",trustee_subset,")"))
 
 trustee_subset_names_number <- sort(unique(df$funding_sources)) %>%
   paste(sep="",collapse="; ")
 
 df <- df %>% select(-funding_sources)
 
-df$`Activation Date` <- as.Date.POSIXct(df$`Activation Date`)
+#df$`Activation Date` <- as.Date.POSIXct(df$`Activation Date`)
 
-df$`Months to Closing Date`<- round(df$`Months to Closing Date`,digits = 0)
-
-
-wb <- createWorkbook()
+#df$`Months to Closing Date`<- round(df$`Months to Closing Date`,digits = 0)
 
 options("openxlsx.dateFormat", "mm/dd/yyyy")
 
+df <- df %>% rename("Uncommitted Balance" = `Remaining Available Balance`)
+df <- df %>% mutate(GPURL_binary = ifelse(`Lead GP/Global Theme`=="Urban, Resilience and Land",
+                                 "GPURL",
+                                 "Non-GPURL"))
+
+df$GPURL_binary[is.na(df$GPURL_binary)] <- "Non-GPURL"
 
 sum_df_all <- df %>%
   summarise("# Grants" = n(),
             "$ Amount" = sum(`Grant Amount`),
-            "Balance" = sum(`Uncommitted Balance`)) %>%
-  mutate("percent" = Balance/`$ Amount`)
+            "Available Balance (Uncommitted)" = sum(`Uncommitted Balance`)) %>%
+  mutate("percent" =`Available Balance (Uncommitted)`/`$ Amount`)
 
-sum_df_all$by_8_2020 <- df %>% filter(`Trustee Fund Name` %in% current_trustee_subset$temp.name) %>%
+#Changeeeeee
+sum_df_all$by_8_2020 <- df %>%
+  filter(`Trustee Fund Name` %in% current_trustee_subset$temp.name) %>%
   select(`Uncommitted Balance`) %>%
   sum()
 
@@ -146,8 +182,8 @@ sum_df_GPURL <- df %>%
   filter(GPURL_binary=="GPURL") %>% 
   summarise("# Grants" = n(),
             "$ Amount" = sum(`Grant Amount`),
-            "Balance" = sum(`Uncommitted Balance`))%>%
-  mutate("percent"= Balance/`$ Amount`)
+            "Available Balance (Uncommitted)" = sum(`Uncommitted Balance`))%>%
+  mutate("percent"= `Available Balance (Uncommitted)`/`$ Amount`)
 
 sum_df_GPURL$by_8_2020 <- df %>% filter(`Trustee Fund Name` %in% current_trustee_subset$temp.name,
                                         GPURL_binary=="GPURL") %>%
@@ -157,8 +193,8 @@ sum_df_non_GPURL <- df %>%
   filter(GPURL_binary=="Non-GPURL") %>% 
   summarise("# Grants" = n(),
             "$ Amount" = sum(`Grant Amount`),
-            "Balance" = sum(`Uncommitted Balance`))%>%
-  mutate("percent"= Balance/`$ Amount`) 
+            "Available Balance (Uncommitted)" = sum(`Uncommitted Balance`))%>%
+  mutate("percent"= `Available Balance (Uncommitted)`/`$ Amount`) 
 
 sum_df_non_GPURL$by_8_2020 <- df %>%
   filter(`Trustee Fund Name` %in% current_trustee_subset$temp.name,
@@ -166,14 +202,14 @@ sum_df_non_GPURL$by_8_2020 <- df %>%
   select(`Uncommitted Balance`) %>% sum()
 
 
-sum_display_df <- data.frame("Summary"= c("Grant Count",
-                                          "Total $ (Million)",
-                                          "Total $ (Uncommitted)",
-                                          "Percent Uncommitted",
-                                          paste("Total $ (Uncommitted) under",current_trustee_subset_collapsed)), 
-                             "GPURL"=unname(unlist(as.list(sum_df_GPURL))),
-                             "Non-GPURL"=unname(unlist(as.list(sum_df_non_GPURL))),
-                             "Combined Total"=unname(unlist(as.list(sum_df_all))))
+sum_display_df <- data.frame("Summary" = c("Grant Count",
+                                          "Total $",
+                                          "Total Available Balance (Uncommitted)",
+                                          "Percent Available Balance (Uncommitted)",
+                                          paste("Total Available Balance (Uncommitted) under",current_trustee_subset_collapsed)),
+                             "GPURL" = unname(unlist(as.list(sum_df_GPURL))),
+                             "Non-GPURL" = unname(unlist(as.list(sum_df_non_GPURL))),
+                             "Combined Total" = unname(unlist(as.list(sum_df_all))))
 
 names(sum_display_df) <- c("Summary","GPURL","Non-GPURL","Combined Total")
 
@@ -182,12 +218,12 @@ names(sum_display_df) <- c("Summary","GPURL","Non-GPURL","Combined Total")
 risk_summary <- df %>% group_by(`Disbursement Risk Level`) %>% 
   summarise("Grant Count" = n(),
             "Total Grant Amount" = sum(`Grant Amount`),
-            "Total Uncommitted" = sum(`Uncommitted Balance`))
+            "Total Available Balance (Uncommitted)" = sum(`Uncommitted Balance`))
 
 risk_summary[6,] <-  c("Total Combined",
                        sum(risk_summary$`Grant Count`),
                        sum(risk_summary$`Total Grant Amount`),
-                       sum(risk_summary$`Total Uncommitted`))
+                       sum(risk_summary$`Total Available Balance (Uncommitted)`))
 
 T_risk_summary <- risk_summary %>% data.table::transpose()
 colnames(T_risk_summary) <- T_risk_summary[1,]
@@ -195,7 +231,6 @@ T_risk_summary$Summary <- colnames(risk_summary)
 T_risk_summary <- T_risk_summary[-1,]
 
 
-T_risk_summary %>% as.data.frame() 
 
 T_risk_summary <- T_risk_summary %>% select(Summary,
                                             `Very High Risk`,
@@ -222,12 +257,12 @@ legend_text <- c("Closed. These grants are under the grace period.",
 report_title <- paste("Disbursement Risk for",region,"as of",as.of.date)
 tab_title <- "GFDRR ACTIVE GRANTS"
 
-tab.names <- c("GPURL by Risk","Risk Summary")
+tab.names <- c("Full Grants List","Risk Summary")
 funding_sources <- paste("Funding Sources:",trustee_subset_names_number)
 
 
   # Tab.2.Data Crunch---------------
-all_regions <- c("AFR","SAR","LCR","MNA","ECA","EAP","GLOBAL")
+all_regions <- sort(unique(df$`Region Name`))
 
 list_dfs <- list()
 
@@ -244,15 +279,17 @@ summary_risk_tab_2 <- function(temp.region="ALL"){
     group_by(`Disbursement Risk Level`) %>% 
     summarise("Grant Count" = n(),
               "Total Grant Amount" = sum(`Grant Amount`),
-              "Total Uncommitted" = sum(`Uncommitted Balance`))
+              "Total Available Balance (uncommitted)" = sum(`Uncommitted Balance`))
   
   GPURL.2 <- df %>%
     filter(`Trustee Fund Name` %in% current_trustee_subset$temp.name,
-           GPURL_binary=="GPURL") %>%
-    group_by(`Disbursement Risk Level`) %>% 
-    summarise("Uncommitted to Implement by 8/2020"=sum(`Uncommitted Balance`)) 
+           GPURL_binary=="GPURL",
+           `Region Name` %in% temp.region) %>%
+    group_by(`Disbursement Risk Level`) %>% #,`Trustee Fund Name`) %>% 
+    summarise("Available Balance (uncommitted) to Implement by 8/2020"=sum(`Uncommitted Balance`),
+              "PO Commitments to spend by 8/2020"=sum(`PO Commitments`)) 
   
-  GPURL <- full_join(GPURL,GPURL.2)
+  GPURL <- full_join(GPURL,GPURL.2,by="Disbursement Risk Level")
  
   NON.GPURL <- df %>% 
     filter(`Region Name` %in% temp.region,
@@ -260,27 +297,31 @@ summary_risk_tab_2 <- function(temp.region="ALL"){
     group_by(`Disbursement Risk Level`) %>% 
     summarise("Grant Count" = n(),
               "Total Grant Amount" = sum(`Grant Amount`),
-              "Total Uncommitted" = sum(`Uncommitted Balance`))
+              "Total Available Balance (uncommitted)" = sum(`Uncommitted Balance`))
   
   NON.GPURL.2 <- df %>%
     filter(`Trustee Fund Name` %in% current_trustee_subset$temp.name,
-           GPURL_binary=="Non-GPURL") %>%
+           GPURL_binary=="Non-GPURL",
+           `Region Name` %in% temp.region) %>%
     group_by(`Disbursement Risk Level`) %>% 
-    summarise("Uncommitted to Implement by 8/2020"=sum(`Uncommitted Balance`))
+    summarise("Available Balance (uncommitted) to Implement by 8/2020"=sum(`Uncommitted Balance`),
+              "PO Commitments to spend by 8/2020"=sum(`PO Commitments`))
   
-  NON.GPURL <- full_join(NON.GPURL,NON.GPURL.2)
+  NON.GPURL <- full_join(NON.GPURL,NON.GPURL.2,by="Disbursement Risk Level")
     
   output <- full_join(GPURL,NON.GPURL,by="Disbursement Risk Level",suffix = c(" (GPURL)", " (Non-GPURL)"))
   
   total_row <- c("Total",
                  sum(output$`Grant Count (GPURL)`,na.rm = TRUE),
                  sum(output$`Total Grant Amount (GPURL)`,na.rm = TRUE),
-                 sum(output$`Total Uncommitted (GPURL)`,na.rm = TRUE),
-                 sum(output$`Uncommitted to Implement by 8/2020 (GPURL)`,na.rm = TRUE),
+                 sum(output$`Total Available Balance (uncommitted) (GPURL)`,na.rm = TRUE),
+                 sum(output$`Available Balance (uncommitted) to Implement by 8/2020 (GPURL)`,na.rm = TRUE),
+                 sum(output$`PO Commitments to spend by 8/2020 (GPURL)`,na.rm = TRUE),
                  sum(output$`Grant Count (Non-GPURL)`,na.rm = TRUE),
                  sum(output$`Total Grant Amount (Non-GPURL)`,na.rm = TRUE),
-                 sum(output$`Total Uncommitted (Non-GPURL)`,na.rm = TRUE),
-                 sum(output$`Uncommitted to Implement by 8/2020 (Non-GPURL)`,na.rm = TRUE))
+                 sum(output$`Total Available Balance (uncommitted) (Non-GPURL)`,na.rm = TRUE),
+                 sum(output$`Available Balance (uncommitted) to Implement by 8/2020 (Non-GPURL)`,na.rm = TRUE),
+                 sum(output$`PO Commitments to spend by 8/2020 (Non-GPURL)`,na.rm = TRUE))
   
   output <- rbind(output, total_row)
   for (j in unique(df$`Disbursement Risk Level`)) {
@@ -304,14 +345,17 @@ summary_risk_tab_2 <- function(temp.region="ALL"){
   
   output <- output %>% arrange(`Disbursement Risk Level`)
   
-  output <- output %>% mutate(`Grant Count (GPURL)`=as.numeric(`Grant Count (GPURL)`),
-                              `Total Grant Amount (GPURL)`=as.numeric(`Total Grant Amount (GPURL)`),
-                              `Total Uncommitted (GPURL)`=as.numeric(`Total Uncommitted (GPURL)`),
-                              `Uncommitted to Implement by 8/2020 (GPURL)`= as.numeric(`Uncommitted to Implement by 8/2020 (GPURL)`),
-                              `Grant Count (Non-GPURL)`= as.numeric(`Grant Count (Non-GPURL)`),
-                              `Total Grant Amount (Non-GPURL)`= as.numeric(`Total Grant Amount (Non-GPURL)`),
-                              `Total Uncommitted (Non-GPURL)`= as.numeric(`Total Uncommitted (Non-GPURL)`),
-                              `Uncommitted to Implement by 8/2020 (Non-GPURL)`= as.numeric(`Uncommitted to Implement by 8/2020 (Non-GPURL)`))
+  output <- output %>%
+    mutate(`Grant Count (GPURL)`=as.numeric(`Grant Count (GPURL)`),
+           `Total Grant Amount (GPURL)`=as.numeric(`Total Grant Amount (GPURL)`),
+           `Total Available Balance (uncommitted) (GPURL)`=as.numeric(`Total Available Balance (uncommitted) (GPURL)`),
+           `Available Balance (uncommitted) to Implement by 8/2020 (GPURL)`= as.numeric(`Available Balance (uncommitted) to Implement by 8/2020 (GPURL)`),
+           `PO Commitments to spend by 8/2020 (GPURL)` = as.numeric(`PO Commitments to spend by 8/2020 (GPURL)`),
+           `Grant Count (Non-GPURL)`= as.numeric(`Grant Count (Non-GPURL)`),
+           `Total Grant Amount (Non-GPURL)`= as.numeric(`Total Grant Amount (Non-GPURL)`),
+           `Total Available Balance (uncommitted) (Non-GPURL)`= as.numeric(`Total Available Balance (uncommitted) (Non-GPURL)`),
+           `Available Balance (uncommitted) to Implement by 8/2020 (Non-GPURL)`= as.numeric(`Available Balance (uncommitted) to Implement by 8/2020 (Non-GPURL)`),
+           `PO Commitments to spend by 8/2020 (Non-GPURL)`= as.numeric(`PO Commitments to spend by 8/2020 (Non-GPURL)`))
   
   
   
@@ -346,10 +390,14 @@ writeData(wb,1,legend_text,16,3)
 
 RISK.df.row <- 10
 
-writeDataTable(wb,1, 
-              dplyr::select(df,-c(Jaime_Months_to_closing,
-                            Jaime_Uncommitted_balance,
-                            Jaime_Req_Dis_Rate)),
+excel_df <- df %>% rename("TTL Name"=`Child Fund TTL Name`,
+                          "Available Balance (Uncommitted)"= `Uncommitted Balance`) %>% 
+  select(-c(`Uncommitted Balance (Percent)`,`Grace Period`,GPURL_binary)) %>% 
+  mutate(`Required Monthly Disbursement Rate` = ifelse(`Required Monthly Disbursement Rate`==999,
+                                                       NA,
+                                                       round(`Required Monthly Disbursement Rate`, digits = 2)))
+
+writeDataTable(wb,1,excel_df,
                       startRow = RISK.df.row,
                       startCol = 1)
 
@@ -367,23 +415,23 @@ very_high_risk_rows <- which(df$`Disbursement Risk Level`=="Very High Risk")
 grace_period_rows <- which(df$`Disbursement Risk Level`=="Closed (Grace Period)")
 
 for (i in low_risk_rows){
-  addStyle(wb,1,rows=i+RISK.df.row,cols=1:length(df),style = low_risk)
+  addStyle(wb,1,rows=i+RISK.df.row,cols=1:length(excel_df),style = low_risk)
 }
 
 for (i in medium_risk_rows){
-  addStyle(wb,1,rows=i+RISK.df.row,cols=1:length(df),style = medium_risk)
+  addStyle(wb,1,rows=i+RISK.df.row,cols=1:length(excel_df),style = medium_risk)
 }
 
 for (i in high_risk_rows){
-  addStyle(wb,1,rows=i+RISK.df.row,cols=1:length(df),style = high_risk)
+  addStyle(wb,1,rows=i+RISK.df.row,cols=1:length(excel_df),style = high_risk)
 }
 
 for (i in very_high_risk_rows){
-  addStyle(wb,1,rows=i+RISK.df.row,cols=1:length(df),style = very_high_risk)
+  addStyle(wb,1,rows=i+RISK.df.row,cols=1:length(excel_df),style = very_high_risk)
 }
 
 for (i in grace_period_rows){
-  addStyle(wb,1,rows=i+RISK.df.row,cols=1:length(df),style = grace_period_style)
+  addStyle(wb,1,rows=i+RISK.df.row,cols=1:length(excel_df),style = grace_period_style)
 }
 
 header_style <- createStyle(borderColour = getOption("openxlsx.borderColour", "black"),
@@ -394,7 +442,7 @@ header_style <- createStyle(borderColour = getOption("openxlsx.borderColour", "b
                             wrapText = TRUE)
 
 dollar_format <- createStyle(numFmt = "ACCOUNTING")
-percent_format <- createStyle(numFmt = "0.0%")
+percent_format <- createStyle(numFmt = "0%")
 date_format <- createStyle(numFmt = "mm/dd/yyyy")
 num_format <- createStyle(numFmt = "NUMBER")
 wrapped_text <- createStyle(wrapText = TRUE,valign = "top")
@@ -403,16 +451,16 @@ addStyle(wb,1,rows=RISK.df.row,cols=1:(length(df)),style = header_style)
 
 number_format_range <- RISK.df.row:(nrow(df)+RISK.df.row)
 
-
+#addStyle(wb,1,rows=number_format_range,cols=12,style = date_format,stack = TRUE)
 addStyle(wb,1,rows=number_format_range,cols=13,style = date_format,stack = TRUE)
 addStyle(wb,1,rows=number_format_range,cols=14,style = date_format,stack = TRUE)
 addStyle(wb,1,rows=number_format_range,cols=15,style = dollar_format,stack = TRUE)
 addStyle(wb,1,rows=number_format_range,cols=16,style = dollar_format,stack = TRUE)
 addStyle(wb,1,rows=number_format_range,cols=17,style = dollar_format,stack = TRUE)
 addStyle(wb,1,rows=number_format_range,cols=18,style = dollar_format,stack = TRUE)
-#addStyle(wb,1,rows=number_format_range,cols=20,style = num_format,stack = TRUE)
-addStyle(wb,1,rows=number_format_range,cols=22,style = percent_format,stack = TRUE)
-addStyle(wb,1,rows=number_format_range,cols=23,style = percent_format,stack = TRUE)
+addStyle(wb,1,rows=number_format_range,cols=20,style = percent_format,stack = TRUE)
+#addStyle(wb,1,rows=number_format_range,cols=22,style = percent_format,stack = TRUE)
+#addStyle(wb,1,rows=number_format_range,cols=23,style = percent_format,stack = TRUE)
 
 setColWidths(wb,1, cols=1:length(df), widths = "auto")
 setColWidths(wb,1, cols=2, widths = 15)
@@ -420,6 +468,7 @@ setColWidths(wb,1, cols=1, widths = 25)
 addStyle(wb,1,rows = 8,cols = 1,style = wrapped_text,stack = TRUE)
 addStyle(wb,1,rows = 10,cols = 1:length(df),style = wrapped_text,stack = TRUE)
 setColWidths(wb,1, cols=3, widths = 17)
+setColWidths(wb,1, cols=4, widths = 17)
 setColWidths(wb,1, cols=5, widths = 20) #child fund name
 setColWidths(wb,1, cols=6, widths = 9)
 setColWidths(wb,1, cols=9, widths = 13)
@@ -430,11 +479,12 @@ setColWidths(wb,1, cols=13, widths = 15)
 setColWidths(wb,1, cols=15, widths = 14)
 setColWidths(wb,1, cols=16, widths = 40)
 setColWidths(wb,1, cols=17, widths = 15)
-setColWidths(wb,1, cols=19, widths = 14)
-setColWidths(wb,1, cols=20, widths = 15)
+setColWidths(wb,1, cols=18, widths = 20)
+setColWidths(wb,1, cols=19, widths = 8)
+setColWidths(wb,1, cols=20, widths = 13)
 setColWidths(wb,1, cols=21, widths = 19)
-setColWidths(wb,1, cols=22, widths = 15)
-setColWidths(wb,1, cols=23, widths = 15)
+setColWidths(wb,1, cols=22, widths = 30)
+
 
 
 
@@ -488,26 +538,26 @@ writeDataTable(wb,2,list_dfs[[4]],startCol = 1,startRow = 35,
                withFilter = F,firstColumn = T,
                tableStyle = "TableStyleLight1")
 
-writeData(wb,2,names(list_dfs[5]),startCol = 11,startRow = 3)
-writeDataTable(wb,2,list_dfs[[5]],startCol = 11,startRow = 5,
+writeData(wb,2,names(list_dfs[5]),startCol = 13,startRow = 3)
+writeDataTable(wb,2,list_dfs[[5]],startCol = 13,startRow = 5,
                withFilter = F,firstColumn = T,
                tableStyle = "TableStyleLight1")
 
 
-writeData(wb,2,names(list_dfs[6]),startCol = 11,startRow = 13)
-writeDataTable(wb,2,list_dfs[[6]],startCol = 11,startRow = 15,
+writeData(wb,2,names(list_dfs[6]),startCol = 13,startRow = 13)
+writeDataTable(wb,2,list_dfs[[6]],startCol = 13,startRow = 15,
                withFilter = F,firstColumn = T,
                tableStyle = "TableStyleLight1")
 
 
-writeData(wb,2,names(list_dfs[7]),startCol = 11,startRow = 23)
-writeDataTable(wb,2,list_dfs[[7]],startCol = 11,startRow = 25,
+writeData(wb,2,names(list_dfs[7]),startCol = 13,startRow = 23)
+writeDataTable(wb,2,list_dfs[[7]],startCol = 13,startRow = 25,
                withFilter = F,firstColumn = T,
                tableStyle = "TableStyleLight1")
 
 
-writeData(wb,2,names(list_dfs[8]),startCol = 11,startRow = 33)
-writeDataTable(wb,2,list_dfs[[8]],startCol = 11,startRow = 35,
+writeData(wb,2,names(list_dfs[8]),startCol = 13,startRow = 33)
+writeDataTable(wb,2,list_dfs[[8]],startCol = 13,startRow = 35,
                withFilter = F,firstColumn = T,
                tableStyle = "TableStyleLight1")
 
@@ -515,149 +565,191 @@ writeDataTable(wb,2,list_dfs[[8]],startCol = 11,startRow = 35,
 addStyle(wb,2,dollar_format,rows = 6:42,cols = 3,stack = TRUE)
 addStyle(wb,2,dollar_format,rows = 6:42,cols = 4,stack = TRUE)
 addStyle(wb,2,dollar_format,rows = 6:42,cols = 5,stack = TRUE)
-addStyle(wb,2,dollar_format,rows = 6:42,cols = 7,stack = TRUE)
+addStyle(wb,2,dollar_format,rows = 6:42,cols = 6,stack = TRUE)
 addStyle(wb,2,dollar_format,rows = 6:42,cols = 8,stack = TRUE)
 addStyle(wb,2,dollar_format,rows = 6:42,cols = 9,stack = TRUE)
+addStyle(wb,2,dollar_format,rows = 6:42,cols = 10,stack = TRUE)
+addStyle(wb,2,dollar_format,rows = 6:42,cols = 11,stack = TRUE)
 
-addStyle(wb,2,dollar_format,rows = 6:42,cols = 13,stack = TRUE)
-addStyle(wb,2,dollar_format,rows = 6:42,cols = 14,stack = TRUE)
+
+
 addStyle(wb,2,dollar_format,rows = 6:42,cols = 15,stack = TRUE)
+addStyle(wb,2,dollar_format,rows = 6:42,cols = 16,stack = TRUE)
 addStyle(wb,2,dollar_format,rows = 6:42,cols = 17,stack = TRUE)
 addStyle(wb,2,dollar_format,rows = 6:42,cols = 18,stack = TRUE)
-addStyle(wb,2,dollar_format,rows = 6:42,cols = 19,stack = TRUE)
+addStyle(wb,2,dollar_format,rows = 6:42,cols = 20,stack = TRUE)
+addStyle(wb,2,dollar_format,rows = 6:42,cols = 21,stack = TRUE)
+addStyle(wb,2,dollar_format,rows = 6:42,cols = 22,stack = TRUE)
+addStyle(wb,2,dollar_format,rows = 6:42,cols = 23,stack = TRUE)
 
-setColWidths(wb,2,cols=c(3,4,5,7,8,9,13,14,15,17,18,19),widths = 16)
+setColWidths(wb,2,cols=c(3,4,5,6,7,8,9,10,11,14,15,16,17,18,20,21,22,23),widths = 15)
 setColWidths(wb,2,cols=c(1,11),widths = 17)
 addStyle(wb,2,very_high_risk,rows = c(6,16,26,36),cols = 1)
-addStyle(wb,2,very_high_risk,rows = c(6,16,26,36),cols = 11)
+addStyle(wb,2,very_high_risk,rows = c(6,16,26,36),cols = 13)
 addStyle(wb,2,high_risk,rows = c(7,17,27,37),cols = 1)
-addStyle(wb,2,high_risk,rows = c(7,17,27,37),cols = 11)
+addStyle(wb,2,high_risk,rows = c(7,17,27,37),cols = 13)
 addStyle(wb,2,medium_risk,rows = c(8,18,28,38),cols = 1)
-addStyle(wb,2,medium_risk,rows = c(8,18,28,38),cols = 11)
+addStyle(wb,2,medium_risk,rows = c(8,18,28,38),cols = 13)
 addStyle(wb,2,low_risk,rows = c(9,19,29,39),cols = 1)
-addStyle(wb,2,low_risk,rows = c(9,19,29,39),cols = 11)
+addStyle(wb,2,low_risk,rows = c(9,19,29,39),cols = 13)
 addStyle(wb,2,grace_period_style,rows = c(10,20,30,40),cols = 1)
-addStyle(wb,2,grace_period_style,rows = c(10,20,30,40),cols = 11)
+addStyle(wb,2,grace_period_style,rows = c(10,20,30,40),cols = 13)
 
 
 writeData(wb,2,"GPURL",startCol = 2,startRow = (4))
 writeData(wb,2,"GPURL",startCol = 2,startRow = (14))
 writeData(wb,2,"GPURL",startCol = 2,startRow = (24))
 writeData(wb,2,"GPURL",startCol = 2,startRow = (34))
-writeData(wb,2,"GPURL",startCol = 12,startRow = (4))
-writeData(wb,2,"GPURL",startCol = 12,startRow = (14))
-writeData(wb,2,"GPURL",startCol = 12,startRow = (24))
-writeData(wb,2,"GPURL",startCol = 12,startRow = (34))
+writeData(wb,2,"GPURL",startCol = 14,startRow = (4))
+writeData(wb,2,"GPURL",startCol = 14,startRow = (14))
+writeData(wb,2,"GPURL",startCol = 14,startRow = (24))
+writeData(wb,2,"GPURL",startCol = 14,startRow = (34))
 
 
-writeData(wb,2,"Non-GPURL",startCol = 6,startRow = (4))
-writeData(wb,2,"Non-GPURL",startCol = 6,startRow = (14))
-writeData(wb,2,"Non-GPURL",startCol = 6,startRow = (24))
-writeData(wb,2,"Non-GPURL",startCol = 6,startRow = (34))
-writeData(wb,2,"Non-GPURL",startCol = 16,startRow = (4))
-writeData(wb,2,"Non-GPURL",startCol = 16,startRow = (14))
-writeData(wb,2,"Non-GPURL",startCol = 16,startRow = (24))
-writeData(wb,2,"Non-GPURL",startCol = 16,startRow = (34))
+writeData(wb,2,"Non-GPURL",startCol = 7,startRow = (4))
+writeData(wb,2,"Non-GPURL",startCol = 7,startRow = (14))
+writeData(wb,2,"Non-GPURL",startCol = 7,startRow = (24))
+writeData(wb,2,"Non-GPURL",startCol = 7,startRow = (34))
+writeData(wb,2,"Non-GPURL",startCol = 19,startRow = (4))
+writeData(wb,2,"Non-GPURL",startCol = 19,startRow = (14))
+writeData(wb,2,"Non-GPURL",startCol = 19,startRow = (24))
+writeData(wb,2,"Non-GPURL",startCol = 19,startRow = (34))
 
 
 mergeCells(wb,2,cols = 1:9,rows = 1)
 
-mergeCells(wb,2,cols = 2:5,rows = 4)
-mergeCells(wb,2,cols = 6:9,rows = 4)
-mergeCells(wb,2,cols = 12:15,rows = 4)
-mergeCells(wb,2,cols = 16:19,rows = 4)
+mergeCells(wb,2,cols = 2:6,rows = 4)
+mergeCells(wb,2,cols = 7:11,rows = 4)
+mergeCells(wb,2,cols = 14:18,rows = 4)
+mergeCells(wb,2,cols = 19:23,rows = 4)
 
-mergeCells(wb,2,cols = 2:5,rows = 14)
-mergeCells(wb,2,cols = 6:9,rows = 14)
-mergeCells(wb,2,cols = 12:15,rows = 14)
-mergeCells(wb,2,cols = 16:19,rows = 14)
+mergeCells(wb,2,cols = 2:6,rows = 14)
+mergeCells(wb,2,cols = 7:11,rows = 14)
+mergeCells(wb,2,cols = 14:18,rows = 14)
+mergeCells(wb,2,cols = 19:23,rows = 14)
 
-mergeCells(wb,2,cols = 2:5,rows = 24)
-mergeCells(wb,2,cols = 6:9,rows = 24)
-mergeCells(wb,2,cols = 12:15,rows = 24)
-mergeCells(wb,2,cols = 16:19,rows = 24)
+mergeCells(wb,2,cols = 2:6,rows = 24)
+mergeCells(wb,2,cols = 7:11,rows = 24)
+mergeCells(wb,2,cols = 14:18,rows = 24)
+mergeCells(wb,2,cols = 19:23,rows = 24)
 
-mergeCells(wb,2,cols = 2:5,rows = 34)
-mergeCells(wb,2,cols = 6:9,rows = 34)
-mergeCells(wb,2,cols = 12:15,rows = 34)
-mergeCells(wb,2,cols = 16:19,rows = 34)
+mergeCells(wb,2,cols = 2:6,rows = 34)
+mergeCells(wb,2,cols = 7:11,rows = 34)
+mergeCells(wb,2,cols = 14:18,rows = 34)
+mergeCells(wb,2,cols = 19:23,rows = 34)
 
 gp_style <- createStyle(fgFill = "#EAE8E8",halign = "center",textDecoration = 'bold')
 
 addStyle(wb,2,gp_style,stack = TRUE,rows = c(4,14,24,34),cols = 2)
-addStyle(wb,2,gp_style,stack = TRUE,rows = c(4,14,24,34),cols = 6)
-addStyle(wb,2,gp_style,stack = TRUE,rows = c(4,14,24,34),cols = 12)
-addStyle(wb,2,gp_style,stack = TRUE,rows = c(4,14,24,34),cols = 16)
+addStyle(wb,2,gp_style,stack = TRUE,rows = c(4,14,24,34),cols = 7)
+addStyle(wb,2,gp_style,stack = TRUE,rows = c(4,14,24,34),cols = 14)
+addStyle(wb,2,gp_style,stack = TRUE,rows = c(4,14,24,34),cols = 19)
 
 addStyle(wb,2,black_and_bold,rows = c(3,13,23,33),cols=1,stack = T)
-addStyle(wb,2,black_and_bold,rows = c(3,13,23,33),cols=11,stack = T)
+addStyle(wb,2,black_and_bold,rows = c(3,13,23,33),cols=13,stack = T)
 
 
 for (f in c(5,15,25,35)){
-addStyle(wb,2,wrapped_text,rows=f,cols=1:20)}
+addStyle(wb,2,wrapped_text,rows= f,cols=1:23)}
 
 for (i in all_regions){
-temp_df <- report_grants %>%
+temp_df <- df %>%
   filter(`Region Name` == i,
-         !is.na(`Lead GP/Global Themes`)
+         !is.na(`Lead GP/Global Theme`)
   )
 
-#i <- which(all_regions==i)
 
-temp_df$unnacounted_amount <- temp_df$`Grant Amount` -
-  (temp_df$`Cumulative Disbursements` + temp_df$`PO Commitments`)
+#getsummary df from previoys tab#2 and add it to the regional
+temp_risk_summary <- list_dfs[[i]]
 
+
+#begin creation of other dataframes in the worksheet
 sum_df_all <- temp_df %>%
   summarise("# Grants" = n(),
             "$ Amount" = sum(`Grant Amount`),
-            "Balance" = sum(unnacounted_amount)) %>%
-  mutate("percent" = Balance/`$ Amount`)
+            "Available Balance (Uncommitted)" = sum(`Uncommitted Balance`)) %>%
+  mutate("percent" =`Available Balance (Uncommitted)`/`$ Amount`)
+
+sum_df_all$uncommitted_8020 <- temp_df %>%
+  filter(`Trustee Fund Name` %in% current_trustee_subset$temp.name) %>% 
+  select(`Uncommitted Balance`) %>% sum()
+
+sum_df_all$PO_8020 <- temp_df %>%
+  filter(`Trustee Fund Name` %in% current_trustee_subset$temp.name) %>% 
+  select(`PO Commitments`) %>% sum()
+
+
 
 sum_df_GPURL <-  temp_df %>%
   filter(GPURL_binary=="GPURL") %>% 
   summarise("# Grants" = n(),
             "$ Amount" = sum(`Grant Amount`),
-            "Balance" = sum(unnacounted_amount))%>%
-  mutate("percent"= Balance/`$ Amount`)
+            "Available Balance (Uncommitted)" = sum(`Uncommitted Balance`))%>%
+  mutate("percent"= `Available Balance (Uncommitted)`/`$ Amount`)
+
+sum_df_GPURL$uncommitted_8020 <- temp_df %>%
+  filter(`Trustee Fund Name` %in% current_trustee_subset$temp.name,
+         GPURL_binary=="GPURL") %>% 
+  select(`Uncommitted Balance`) %>% sum()
+
+sum_df_GPURL$PO_8020 <- temp_df %>%
+  filter(`Trustee Fund Name` %in% current_trustee_subset$temp.name,
+         GPURL_binary=="GPURL") %>% 
+  select(`PO Commitments`) %>% sum()
+
 
 sum_df_non_GPURL <- temp_df %>%
   filter(GPURL_binary=="Non-GPURL") %>% 
   summarise("# Grants" = n(),
             "$ Amount" = sum(`Grant Amount`),
-            "Balance" = sum(unnacounted_amount))%>%
-  mutate("percent"= Balance/`$ Amount`) 
+            "Available Balance (Uncommitted)" = sum(`Uncommitted Balance`))%>%
+  mutate("percent"= `Available Balance (Uncommitted)`/`$ Amount`) 
+
+sum_df_non_GPURL$uncommitted_8020 <- temp_df %>%
+  filter(`Trustee Fund Name` %in% current_trustee_subset$temp.name,
+         GPURL_binary=="Non-GPURL") %>% 
+  select(`Uncommitted Balance`) %>% sum()
+
+sum_df_non_GPURL$PO_8020 <- temp_df %>%
+  filter(`Trustee Fund Name` %in% current_trustee_subset$temp.name,
+         GPURL_binary=="Non-GPURL") %>% 
+  select(`PO Commitments`) %>% sum()
+
 
 
 sum_display_df <- data.frame("Summary"= c("Grant Count",
-                                          "Total $ (Million)",
-                                          "Total Uncommitted Balance ($)",
-                                          "% Uncommitted Balance ($)"),
-                             "GPURL"=unname(unlist(as.list(sum_df_GPURL))),
-                             "Non-GPURL"=unname(unlist(as.list(sum_df_non_GPURL))),
-                             "Combined Total"=unname(unlist(as.list(sum_df_all))))
+                                          "Total $",
+                                          "Total Available Balance (Uncommitted)",
+                                          "% Available Balance (Uncommitted)",
+                                          "Total $ Available Balance (Uncommitted) Required to Implement by 8/2020 (MDTF, Japan 1, ACP-EU)",
+                                          "PO Commitments to spend by 8/2020  (MDTF, Japan 1, ACP-EU)"),
+                             "GPURL" = unname(unlist(as.list(sum_df_GPURL))),
+                             "Non-GPURL" = unname(unlist(as.list(sum_df_non_GPURL))),
+                             "Combined Total" = unname(unlist(as.list(sum_df_all))))
 
 names(sum_display_df) <- c("Summary","GPURL","Non-GPURL"," Combined Total")
 
-
+sum_display_df <- sum_display_df[-c(3:4),]
 #---------COUNTRIES DF ----------------------
 temp_df_all <- temp_df %>%
   group_by(Country) %>%
   summarise("# Grants" = n(),
             "$ Amount" = (sum(`Grant Amount`)),
-            "Balance" = (sum(unnacounted_amount)))
+            "Available Balance (Uncommitted)" = (sum(`Uncommitted Balance`)))
 
 temp_df_GPURL <- temp_df %>%
   filter(GPURL_binary=="GPURL") %>% 
   group_by(Country) %>%
   summarise("# Grants" = n(),
             "$ Amount" = (sum(`Grant Amount`)),
-            "Balance" = (sum(unnacounted_amount)))
+            "Available Balance (Uncommitted)" = (sum(`Uncommitted Balance`)))
 
-temp_df_non_GPURL <- temp_df %>% filter(GPURL_binary=="Non-GPURL") %>% 
+temp_df_non_GPURL <- temp_df %>%
+  filter(GPURL_binary=="Non-GPURL") %>% 
   group_by(Country) %>%
   summarise("# Grants" = n(),
             "$ Amount" = (sum(`Grant Amount`)),
-            "Balance" = (sum(unnacounted_amount)))
+            "Available Balance (Uncommitted)" = (sum(`Uncommitted Balance`)))
 
 
 display_df_partial <- full_join(temp_df_GPURL,
@@ -677,19 +769,24 @@ temp_df_all <- temp_df %>%
   group_by(`Trustee Fund Name`) %>%
   summarise("# Grants" = n(),
             "$ Amount" = (sum(`Grant Amount`)),
-            "Balance" = (sum(unnacounted_amount)))
+            "PO Commitments"=sum(`PO Commitments`),
+            "Available Balance (Uncommitted)" = (sum(`Uncommitted Balance`))
+            )
 
 temp_df_GPURL <-  temp_df %>% filter(GPURL_binary=="GPURL") %>% 
   group_by(`Trustee Fund Name`) %>%
   summarise("# Grants" = n(),
             "$ Amount" = (sum(`Grant Amount`)),
-            "Balance" = (sum(unnacounted_amount)))
+            "PO Commitments"=sum(`PO Commitments`),
+            "Available Balance (Uncommitted)" = (sum(`Uncommitted Balance`))
+            )
 
 temp_df_non_GPURL <- temp_df %>% filter(GPURL_binary=="Non-GPURL") %>% 
   group_by(`Trustee Fund Name`) %>%
   summarise("# Grants" = n(),
             "$ Amount" = (sum(`Grant Amount`)),
-            "Balance" = (sum(unnacounted_amount)))
+            "PO Commitments"=sum(`PO Commitments`),
+            "Available Balance (Uncommitted)" = (sum(`Uncommitted Balance`)))
 
 
 display_df_partial <- full_join(temp_df_GPURL,
@@ -698,14 +795,14 @@ display_df_partial <- full_join(temp_df_GPURL,
                                 suffix=c(" (GPURL)"," (Non-GPURL)"))
 
 
-display_df_funding <- left_join(temp_df_all,display_df_partial,by="Trustee Fund Name")
+display_df_funding <- left_join(temp_df_all, display_df_partial , by = "Trustee Fund Name")
 
 
 #------ CREATE EXCEL WORKBOOK AND ADD DATAFRAMES -------
 
 
 #temp_df <- reactive_df()
-report_title <- paste0("Summary of GFDRR Portfolio (as of ",report_data_date,")")
+report_title <- paste0("Summary of GFDRR ",i, " Portfolio (as of ",report_data_date,")")
 
 addWorksheet(wb,i)
 # mergeCells(wb,1,c(2,3,4),1)
@@ -717,12 +814,22 @@ writeData(wb,i,
           startRow = 1,
           startCol = 2)
 
+#define row number for start of Grant Detail (by country) table. 
+sr <- 12
+
 writeDataTable(wb,i,  sum_display_df, startRow = 3, startCol = 2, withFilter = F)
-writeDataTable(wb,i,  display_df, startRow = 12, startCol = 2,withFilter = F)
-writeDataTable(wb,i,  display_df_funding, startRow = (15+(nrow(display_df))), startCol = 2,withFilter = F)
+writeDataTable(wb,i,  temp_risk_summary, startRow = 3, startCol = 7, withFilter = F)
+writeDataTable(wb,i,  display_df, startRow = sr, startCol = 2,withFilter = F)
+writeDataTable(wb,i,  display_df_funding, startRow = ((sr+4)+(nrow(display_df))), startCol = 2,withFilter = F)
+
+writeData(wb,i,
+          "Grant Details (by Country)",
+          startRow = sr-1,
+          startCol = 2)
+
 
 #FORMULAS FOR TOTALS IN DISPLAY DF  -----------
-end_row.display_df <- (12+nrow(display_df))
+end_row.display_df <- (sr+nrow(display_df))
 
 writeFormula(wb,i,x=paste0("=SUM(C12:C",end_row.display_df,")"),startCol = 3,startRow = (end_row.display_df+1))
 writeFormula(wb,i,x=paste0("=SUM(D12:D",end_row.display_df,")"),startCol = 4,startRow = (end_row.display_df+1))
@@ -737,8 +844,14 @@ writeFormula(wb,i,x=paste0("=SUM(K12:K",end_row.display_df,")"),startCol = 11,st
 writeData(wb,i,x="Total",startCol = 2,startRow = (end_row.display_df+1))
 
 #FORMULAS FOR TOTALS IN DISPLAY DF FUNDING -----------
-start_row.funding <- (12+nrow(display_df)+4)
-end_row.funding <- (12+nrow(display_df)+3+nrow(display_df_funding))
+start_row.funding <- (sr+nrow(display_df)+5)
+end_row.funding <- (sr+nrow(display_df)+4+nrow(display_df_funding))
+
+
+writeData(wb,i,
+          "Grant Details (by Funding Source)",
+          startRow = end_row.display_df+3,
+          startCol = 2)
 
 writeFormula(wb,i,x=paste0("=SUM(C",start_row.funding,":C",end_row.funding,")"),startCol = 3,startRow = (end_row.funding+1))
 writeFormula(wb,i,x=paste0("=SUM(D",start_row.funding,":D",end_row.funding,")"),startCol = 4,startRow = (end_row.funding+1))
@@ -749,39 +862,87 @@ writeFormula(wb,i,x=paste0("=SUM(H",start_row.funding,":H",end_row.funding,")"),
 writeFormula(wb,i,x=paste0("=SUM(I",start_row.funding,":I",end_row.funding,")"),startCol = 9,startRow = (end_row.funding+1))
 writeFormula(wb,i,x=paste0("=SUM(J",start_row.funding,":J",end_row.funding,")"),startCol = 10,startRow = (end_row.funding+1))
 writeFormula(wb,i,x=paste0("=SUM(K",start_row.funding,":K",end_row.funding,")"),startCol = 11,startRow = (end_row.funding+1))
+writeFormula(wb,i,x=paste0("=SUM(L",start_row.funding,":L",end_row.funding,")"),startCol = 12,startRow = (end_row.funding+1))
+writeFormula(wb,i,x=paste0("=SUM(M",start_row.funding,":M",end_row.funding,")"),startCol = 13,startRow = (end_row.funding+1))
+writeFormula(wb,i,x=paste0("=SUM(N",start_row.funding,":N",end_row.funding,")"),startCol = 14,startRow = (end_row.funding+1))
 
 writeData(wb,i,x="Total",startCol = 2,startRow = (end_row.funding+1))
 
 percent_format <- createStyle(numFmt = "0%")
 total_style <- createStyle(bgFill = "#5A52FA",fontColour = "#FFFFFF",textDecoration = "bold")
 
-addStyle(wb,i,dollar_format,row=5:6,cols=3)
-addStyle(wb,i,dollar_format,row=5:6,cols=4)
-addStyle(wb,i,dollar_format,row=5:6,cols=5)
-addStyle(wb,i,percent_format,rows=7,cols=3:5)
+addStyle(wb,i,dollar_format,row=5,cols=3:5)
+addStyle(wb,i,dollar_format,row=6,cols=3:5)
+addStyle(wb,i,dollar_format,row=7,cols=3:5)
 
+dollar_columns_Country <- c(4,5,7,8,10,11)
 
-dollar_columns_Country_and_Trustee <- c(4,5,7,8,10,11)
-
-rows.display_df <- 12:(end_row.display_df+1)
+rows.display_df <- sr:(end_row.display_df+1)
 rows.display_df_funding <- start_row.funding:(end_row.funding+1)
 
-for (j in dollar_columns_Country_and_Trustee){
+for (j in dollar_columns_Country){
   addStyle(wb,i,dollar_format,rows=rows.display_df,cols = j)
+}
+
+dollar_columns_funding_sources <- c(4,5,6,8,9,10,12,13,14)
+for (j in dollar_columns_funding_sources){
   addStyle(wb,i,dollar_format,rows=rows.display_df_funding,cols = j)
 }
 
-addStyle(wb,i,total_style,rows=(end_row.display_df+1),cols = 2:11,stack=TRUE )
-addStyle(wb,i,total_style,rows=(end_row.funding+1),cols = 2:11,stack=TRUE)
+
 
 setColWidths(wb,i, cols = 1:ncol(display_df)+1, widths = "auto")
 
+setColWidths(wb,i, cols =1, widths = 4)
+setColWidths(wb,i, cols =2, widths = 60)
+setColWidths(wb,i, cols =3, widths = 15)
 setColWidths(wb,i, cols =4, widths = 15)
+setColWidths(wb,i, cols =5, widths = 17)
 setColWidths(wb,i, cols =6, widths = 8)
+setColWidths(wb,i, cols =8, widths = 17)
 setColWidths(wb,i, cols =9, widths = 8)
-addStyle(wb,1,wrapped_text,cols=1:11,rows = 12,stack = TRUE)
+setColWidths(wb,i, cols =10, widths = 17)
+setColWidths(wb,i, cols =11, widths = 20)
+setColWidths(wb,i, cols =12, widths = 15)
+setColWidths(wb,i, cols =13, widths = 15)
+setColWidths(wb,i, cols =14, widths = 15)
+setColWidths(wb,i, cols =15, widths = 15)
+setColWidths(wb,i, cols =16, widths = 19)
+setColWidths(wb,i, cols =17, widths = 15)
+
+addStyle(wb,i,wrapped_text,cols=1:11,rows = sr,stack = TRUE)
+addStyle(wb,i,wrapped_text,cols=1:14,rows = (start_row.funding-1),stack = TRUE)
+addStyle(wb,i,wrapped_text,cols=2:17,rows = 3,stack = TRUE)
+
+
+
+addStyle(wb,i,very_high_risk,rows = 4,cols = 7)
+addStyle(wb,i,high_risk,rows = 5,cols = 7)
+addStyle(wb,i,medium_risk,rows = 6,cols = 7)
+addStyle(wb,i,low_risk,rows = 7,cols = 7)
+addStyle(wb,i,grace_period_style,rows = 8,cols = 7)
+
+
+
+#add dollar formats to risk summary regional table
+for(ROW in 4:9){
+addStyle(wb,i,dollar_format,row = ROW ,cols=c(9,10,11,12,14,15,16,17))
+}
+
+addStyle(wb,i,total_style,rows=9,cols = 7:17,stack=TRUE)
+addStyle(wb,i,total_style,rows=(end_row.display_df+1),cols = 2:11,stack=TRUE)
+addStyle(wb,i,total_style,rows=(end_row.funding+1),cols = 2:14,stack=TRUE)
 
 }
+
+
+#add raw_data tab 
+raw_data <- read.xlsx(grants_file)
+raw_data <- raw_data %>% filter(Fund %in% df$`Child Fund #`)
+addWorksheet(wb,"Raw Data (SAP)")
+writeDataTable(wb,sheet="Raw Data (SAP)",x = raw_data)
+rm(raw_data)
+rm(excel_df)
 
 
 

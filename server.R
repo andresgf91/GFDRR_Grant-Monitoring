@@ -75,7 +75,7 @@ server <- shinyServer(function(input,output,session) {
    
       })
       
-      output$r2 <- renderPrint(input$p2)
+ 
     }
     if (req(input$nav) == "regions"){
       shinyjs::addClass(selector = "aside.control-sidebar", class = "control-sidebar-open")
@@ -223,6 +223,24 @@ server <- shinyServer(function(input,output,session) {
           color = "light-blue", subtitle = "Total Pending (Un-paid)")
       
       })
+    
+    output$total_active_portfolio <- renderValueBox({
+      sum(grants$`Grant Amount USD`) %>% 
+        dollar(accuracy = 1) %>% 
+        valueBox(
+          value= tags$p(., style = "font-size: 60%;"), icon = icon("file-invoice-dollar"),
+          color = "light-blue", subtitle = "Active Portfolio")
+      
+    })
+    
+    output$total_uncommitted_balance <- renderValueBox({
+      sum(grants$unnacounted_amount) %>% 
+        dollar(accuracy = 1) %>% 
+        valueBox(
+          value= tags$p(., style = "font-size: 60%;"), icon = icon("file-invoice-dollar"),
+          color = "light-blue", subtitle = "Uncommitted Balance in Active Portfolio")
+      
+    })
 
     output$elpie <- renderPlotly({
       
@@ -407,17 +425,17 @@ server <- shinyServer(function(input,output,session) {
       
     })
     
-    output$number_active_grants <- renderValueBox({
-      
-      temp_grants <- grants %>%
-        select(Fund) %>% 
-        distinct() %>% nrow() %>% 
-        valueBox(.,
-          subtitle = "All Active Grants",
-          icon = icon("list-ol"),
-          color = "blue")
-    })
-    
+    # output$number_active_grants <- renderValueBox({
+    #   
+    #   temp_grants <- grants %>%
+    #     select(Fund) %>% 
+    #     distinct() %>% nrow() %>% 
+    #     valueBox(.,
+    #       subtitle = "All Active Grants",
+    #       icon = icon("list-ol"),
+    #       color = "blue")
+    # })
+    # 
     #OPERATIONAL GRANTS ONLY 
     
     output$number_active_grants_op <- renderValueBox({
@@ -1007,7 +1025,7 @@ server <- shinyServer(function(input,output,session) {
       output$trustee_active_grants <- renderValueBox({
         temp_grants <- reactive_grants_trustee()
         temp_grants %>% select(Fund)%>% dplyr::distinct() %>% nrow() %>% 
-          valueBox(subtitle = show_grant_button("Active grants ",
+          valueBox(subtitle = show_grant_button("Active portfolio ",
                                                 "show_active_grants_trustee"),
                    value=.,
                    color = "light-blue")
@@ -1035,7 +1053,7 @@ server <- shinyServer(function(input,output,session) {
                  `Uncommitted Balance` = dollar(`Uncommitted Balance`))
                   
         showModal(modalDialog(size = 'l',
-                              title = "Active Grants",
+                              title = "Active Portfolio",
                               renderTable(data),
                               easyClose = TRUE,
                               footer = downloadBttn('download_active_grants_trustee')))
@@ -1305,7 +1323,7 @@ server <- shinyServer(function(input,output,session) {
 
    },ignoreNULL = T)
     
-    
+    #select all trustees if no region has been selected
     observe({
       if(is.null(input$focal_select_region)){
   
@@ -1322,42 +1340,42 @@ server <- shinyServer(function(input,output,session) {
     })
     
     
-
-    observeEvent(input$focal_select_trustee,{
-
-      if (!is.null(input$focal_select_trustee)){
-      temp.df <- reactive_df()
-      data$focal_grants <- reactive_df()
-
-      data$percent_df <- temp.df %>%
-        select(`Disbursements USD`,`Grant Amount USD`) %>%
-        summarise(total_dis = sum(`Disbursements USD`),
-                  total_awarded=sum(`Grant Amount USD`))
-
-      updateProgressBar(session = session,
-                        id = 'focal_percent_active_disbursed',
-                        value = data$percent_df$total_dis[[1]],
-                        total = data$percent_df$total_awarded[[1]],
-                        status = 'info') }
-
-      attention_needed <- data$focal_grants  %>%
-        filter(percent_unaccounted >=35,
-               months_to_end_disbursement<=6) %>%
-        nrow()
-
-      if(attention_needed>0){
-
-        message_list <- paste(attention_needed,
-                           "Grant(s) are closing in less than 6 months and still have more than 35% available balance")
-
-        output$notifications_Menu <- renderMenu({
-          dropdownMenu(type ="messages",
-                       messageItem(message = message_list,
-                                   from = "System"))
-        })
-      } else {output$notifications_Menu <- NULL }
-      
-    })
+# 
+#     observeEvent(input$focal_select_trustee,{
+# 
+#       if (!is.null(input$focal_select_trustee)){
+#       temp.df <- reactive_df()
+#       data$focal_grants <- reactive_df()
+# 
+#       data$percent_df <- temp.df %>%
+#         select(`Disbursements USD`,`Grant Amount USD`) %>%
+#         summarise(total_dis = sum(`Disbursements USD`),
+#                   total_awarded= sum(`Grant Amount USD`))
+# 
+#       updateProgressBar(session = session,
+#                         id = 'focal_percent_active_disbursed',
+#                         value = data$percent_df$total_dis[[1]],
+#                         total = data$percent_df$total_awarded[[1]],
+#                         status = 'info') }
+# 
+#       attention_needed <- data$focal_grants  %>%
+#         filter(percent_unaccounted >=35,
+#                months_to_end_disbursement<=6) %>%
+#         nrow()
+# 
+#       if(attention_needed>0){
+# 
+#         message_list <- paste(attention_needed,
+#                            "Grant(s) are closing in less than 6 months and still have more than 35% available balance")
+# 
+#         output$notifications_Menu <- renderMenu({
+#           dropdownMenu(type ="messages",
+#                        messageItem(message = message_list,
+#                                    from = "System"))
+#         })
+#       } else {output$notifications_Menu <- NULL }
+#       
+#     })
     
     output$date_data_updated_message <- renderMenu({
       dropdownMenu(type="notifications",
@@ -1437,52 +1455,7 @@ server <- shinyServer(function(input,output,session) {
                    color = 'navy')
       })
       
-      output$region_remaining_committed_disbursed <- renderPlotly({
-        
-        temp_df <- reactive_df()
-        
-        new_df <- data.frame(Disbursed=sum(temp_df$`Disbursements USD`),
-                             Committed=sum(temp_df$`Commitments USD`),
-                             "Available Balance"=sum(temp_df$unnacounted_amount)) %>% 
-          reshape2::melt() %>%
-          mutate(total=sum(temp_df$`Grant Amount USD`)) %>%
-          mutate(Percent=value/total)
-        
-        gg <- new_df %>% ggplot(aes(x=total,
-                                    y=value,
-                                    fill=variable,
-                                    label=percent(percent),
-                                    text=paste(variable,"\n",
-                                               "USD Amount:",dollar(value),"\n",
-                                               "Percent of Total:",percent(Percent)))) +
-          geom_bar(stat='identity',position = 'stack') +
-          # coord_flip() +
-          theme_minimal() +
-          labs(y="USD Amount")+
-          theme(axis.title.y = element_blank(),
-                axis.text.y = element_blank(),
-                axis.ticks.y = element_blank(),
-                panel.background = element_blank(),
-                panel.grid = element_blank(),
-                axis.text.x = element_blank(),
-                axis.ticks.x = element_blank()) +
-          theme(#legend.direction = "horizontal",
-           legend.position = 'bottom',
-            legend.title = element_blank(),
-            axis.title.x = element_blank(),
-            plot.margin = unit(c(0,0,0,0), "cm")) +
-          coord_flip() +
-          scale_fill_discrete(breaks=c("Available Balance","Committed","Disbursed")) +
-          scale_fill_brewer(palette = "Blues") +
-          geom_text(size = 3, position = position_stack(vjust = 0.5)) 
-        
-        plotly::ggplotly(gg, tooltip = "text") %>%
-          layout(legend = list(orientation = 'h',
-                               font = list(size = 10),
-                               x=.2, y = -4,
-                               traceorder="reversed"))
-      
-      })
+
 
       output$focal_region_n_grants_GG <- renderPlotly({
         
@@ -3943,125 +3916,29 @@ server <- shinyServer(function(input,output,session) {
                            detail="this may take a minute or two",{
                              openxlsx::saveWorkbook({
                 
-                source("Sameh_Report.R")
+                source("Sameh_Report_jaime_data.R")
                 wb
                 
           },file,overwrite = TRUE)})
           })
         
-        ### CODE NOT BEING USED   -------------     
-        # output$TTL_balance_GG <- renderPlotly({
-        #   df <- reactive(TTL)
-        #   
-        #   gg <-
-        #     ggplot(TTL_spending_df,
-        #            aes(reorder(item_group, -total_disbursed), total_disbursed,
-        #                fill=item_group)) +
-        #     geom_col() +
-        #     theme_classic() +
-        #     labs(x = "Expense Category", y = "Amount Disbursed") +
-        #     theme(axis.text.x = element_blank()) +
-        #     scale_y_continuous(labels=dollar_format(prefix="$")) +
-        #     labs(fill="Expense Category")
-        #   
-        #   
-        # 
-        #   ggplotly(gg)
-        # })
-        # 
-        
-        
-        # output$single_grant_amount <- renderValueBox({
-        #   grant <- reactive_grant()
-        #   grant$`Grant Amount USD` %>% dollar() %>% 
-        #     valueBox(value=.,subtitle = "Grant Amount",color = "green")
-        #   
-        #   
-        # })
-        # 
-        # output$single_grant_remaining_bal <- renderValueBox({
-        #   grant <- reactive_grant()
-        #   grant$unnacounted_amount %>% dollar() %>% 
-        #     valueBox(value=.,subtitle = "Available Balance",color = "green")
-        #   
-        # })
-        # 
-        # 
-        # 
-        # 
-        # output$single_grant_m_active <- renderValueBox({
-        #   grant <- reactive_grant()
-        #   grant$tf_age_months %>% as.numeric() %>% 
-        #     valueBox(value=.,subtitle = "Months since activation",color = "yellow")
-        #   
-        #   
-        # })
-        # 
-        # 
-        # output$single_grant_m_disrate <- renderValueBox({
-        #   grant <- reactive_grant()
-        #   grant$monthly_disbursement_rate %>% percent()%>% 
-        #     valueBox(value=.,subtitle = "Monthly Disbursement Rate",color = "yellow")
-        #   
-        #   
-        # })
-        # 
-        # 
-        # output$single_grant_m_to_close<- renderValueBox({
-        #   grant <- reactive_grant()
-        #   grant$months_to_end_disbursement %>% as.numeric() %>% 
-        #     valueBox(value=.,subtitle = "Months to end disbursement",color = "orange")
-        #   
-        #   
-        # })
-        # 
-        # output$single_grant_m_req_disrate<- renderValueBox({
-        #   grant <- reactive_grant()
-        #   grant$required_disbursement_rate %>% percent() %>% 
-        #     valueBox(value=.,subtitle = "Months to end disbursement",color = "orange")
-        #   
-        #   
-        # })
-        # 
-        # 
-        # output$grant_expense_GG <- renderPlotly({
-        #   TTL_spending_df <- reactive_grant_expense()
-        #   
-        #   gg <-
-        #     ggplot(TTL_spending_df,
-        #            aes(reorder(item_group, -total_disbursed), total_disbursed,
-        #                fill=item_group)) +
-        #     geom_col() +
-        #     theme_classic() +
-        #     labs(x = "Expense Category", y = "Amount Disbursed") +
-        #     theme(axis.text.x = element_blank()) +
-        #     scale_y_continuous(labels=dollar_format(prefix="$")) +
-        #     labs(fill="Expense Category")
-        #   
-        #   
-        #   
-        #   ggplotly(gg)
-        # })
-        # 
-        # 
-        # output$expense_table <- renderTable({
-        #   df <- reactive_grant_expense()
-        #   grant_amount <- reactive_grant()
-        #   grant_amount <- grant_amount$`Grant Amount USD`
-        #   df  %>%
-        #     group_by(item_group) %>%
-        #     summarise('total_dis' = sum(total_disbursed)) %>%
-        #     arrange(-total_dis) %>%
-        #     mutate(
-        #       "percent_of_total" = percent(total_dis /grant_amount),
-        #       'total_dis' = dollar(total_dis))  %>%
-        #     rename(
-        #       "Expense Category" = item_group,
-        #       "Disbursed to date" = total_dis,
-        #       "% of Grant" = percent_of_total
-        #     )
-        # })
-        # 
+
+        output$Download_source_data.xlsx <- 
+          downloadHandler(
+            filename = function() {
+              paste("Source_Data_as_of_",date_data_udpated,".xlsx", sep="")
+            },
+            content = function(file) {
+              
+              withProgress(message='Compiling and Downloading Data',
+                           detail="this may take a minute or two",{
+                             openxlsx::saveWorkbook({
+                               
+                               source("Raw_data_to_excel.r")
+                               wb
+                               
+                             },file,overwrite = TRUE)})
+            })
         
         
         
@@ -4069,17 +3946,7 @@ server <- shinyServer(function(input,output,session) {
         
         
         
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-})
+}) #END OF ALL CODE (SERVER FUNCTION)
 
 
 

@@ -50,7 +50,7 @@ Header <- dashboardHeaderPlus(title=
 
     
 secretariat_view <-   # menuItem("Secretariat View",icon = icon("dashboard"),
-                       menuItem("General Overview",
+                       menuItem("Portfolio Overview",
                                 tabName = "overview",
                                 icon = icon("dashboard"),
                                 selected = T)
@@ -104,6 +104,8 @@ tab.1 <-  tabItem(tabName = "overview",
                         valueBoxOutput("total_contributions", width = NULL),
                         valueBoxOutput("total_received", width = NULL),
                         valueBoxOutput("total_unpaid", width = NULL),
+                        valueBoxOutput("total_active_portfolio", width = NULL),
+                        valueBoxOutput("total_uncommitted_balance", width = NULL),
                         valueBoxOutput("closing<12", width = NULL)
                       ),
                       column(
@@ -146,7 +148,7 @@ tab.1 <-  tabItem(tabName = "overview",
                         boxPlus(
                           plotlyOutput("elpie",
                                              height="260px"),
-                                title='Active Grants',
+                                title='Active Portfolio',
                                 background = "blue",
                                 enable_label = T,
                                 label_text = NULL,
@@ -334,8 +336,9 @@ tab.3 <-  tabItem(tabName = "regions",
                             closable = F,
                             collapsed = F),
                             boxPlus(
-                              plotlyOutput(outputId = "disbursement_risk_GG", height="260px"),
-                              title='Grants Disbursement Risk',
+                              plotlyOutput(outputId = "disbursement_risk_GG",
+                                           height="260px"),
+                              title ='Grants Disbursement Risk',
                               background = "blue",
                               enable_label = T,
                               label_text = NULL,
@@ -346,8 +349,8 @@ tab.3 <-  tabItem(tabName = "regions",
                             
                         boxPlus(
                           plotlyOutput(outputId = "focal_region_n_grants_GG",
-                                       height="420px"),
-                          title='Active Grants by Trustee',
+                                       height = "420px"),
+                          title ='Active Portfolio by Trustee',
                           background = "light-blue",
                           enable_label = T,
                           label_text = NULL,
@@ -370,7 +373,7 @@ tab.3 <-  tabItem(tabName = "regions",
                             collapsed = T) ,
                           boxPlus(solidHeader = T,
                                   DT::dataTableOutput(outputId = "region_countries_grants_table"),
-                                  title='Countries Summary Table',
+                                  title ='Countries Summary Table',
                                   background = NULL,
                                   enable_label = T,
                                   label_text = NULL,
@@ -533,7 +536,8 @@ tab.reports <- tabItem(
            selectInput(inputId = "report_type",label=NULL,
                        choices= c("Summary Report",
                                   "Disbursement Risk Report",
-                                  "Master Report"),
+                                  "Master Report",
+                                  "Source Data"),
                        selectize=TRUE)),
     column(width=4,
            conditionalPanel(
@@ -591,7 +595,11 @@ tab.reports <- tabItem(
                                     label = 'Download Report')),
     conditionalPanel(condition = "input.report_type == 'Master Report'",
                      downloadButton("Download_master_report.xlsx",
-                                    label = 'Download Report'))
+                                    label = 'Download Report')),
+    
+    conditionalPanel(condition = "input.report_type == 'Source Data'",
+                     downloadButton("Download_source_data.xlsx",
+                                    label = 'Download Data'))
   )
 )
 

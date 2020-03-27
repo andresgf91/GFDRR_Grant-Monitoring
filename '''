@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+  <script type="application/shiny-singletons">4bcc0b425876fc517bf76535fcaec54ab12f56ee,603e796bcfc2ab3685167d58c426f64c15a95192,5db5253b52143a905cb68be1e72ae8fdc57ae952</script>
+  <script type="application/html-dependencies">json2[2014.02.04];jquery[3.4.1];shiny[1.4.0];font-awesome[5.3.1];htmlwidgets[1.5.1];plotly-binding[4.9.1];datatables-css[0.0.0];datatables-binding[0.10];crosstalk[1.0.0];bootstrap[3.4.1];selectize[0.11.2];shinydashboardPlus[0.7.0];shinydashboard[0.7.1]</script>
+<script src="shared/json2-min.js"></script>
+<script src="shared/jquery.min.js"></script>
+<link href="shared/shiny.css" rel="stylesheet" />
+<script src="shared/shiny.min.js"></script>
+<link href="font-awesome-5.3.1/css/all.min.css" rel="stylesheet" />
+<link href="font-awesome-5.3.1/css/v4-shims.min.css" rel="stylesheet" />
+<script src="htmlwidgets-1.5.1/htmlwidgets.js"></script>
+<script src="plotly-binding-4.9.1/plotly.js"></script>
+<link href="datatables-css-0.0.0/datatables-crosstalk.css" rel="stylesheet" />
+<script src="datatables-binding-0.10/datatables.js"></script>
+<link href="crosstalk-1.0.0/css/crosstalk.css" rel="stylesheet" />
+<script src="crosstalk-1.0.0/js/crosstalk.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="shared/bootstrap/css/bootstrap.min.css" rel="stylesheet" />
+<script src="shared/bootstrap/js/bootstrap.min.js"></script>
+<script src="shared/bootstrap/shim/html5shiv.min.js"></script>
+<script src="shared/bootstrap/shim/respond.min.js"></script>
+<link href="shared/selectize/css/selectize.bootstrap3.css" rel="stylesheet" />
+<!--[if lt IE 9]>
+<script src="shared/selectize/js/es5-shim.min.js"></script>
+<![endif]-->
+<script src="shared/selectize/js/selectize.min.js"></script>
+<link href="shinydashboardPlus-0.7.0/css/AdminLTE.min.css" rel="stylesheet" />
+<link href="shinydashboardPlus-0.7.0/css/_all-skins.min.css" rel="stylesheet" />
+<script src="shinydashboardPlus-0.7.0/js/app.min.js"></script>
+<link href="shinydashboard-0.7.1/shinydashboard.css" rel="stylesheet" />
+<script src="shinydashboard-0.7.1/shinydashboard.js"></script>  <title></title>
+  <style>
+  .navbar-custom-menu>.navbar-nav>li>.dropdown-menu {
+  width:600px;
+  }
+    /* body */
+    .content-wrapper, .right-side {
+    background-color: #FFFFFF;
+    }
+    
+    .small-box {height: 150px}
+    
+    .wrapper{
+    overflow-y: hidden;}
+
+  </style>
+  <title>Global Overview</title>
+  <style>.direct-chat-contacts {
+                 -webkit-transform: translate(100%, 0);
+                 -ms-transform: translate(100%, 0);
+                 -o-transform: translate(100%, 0);
+                 transform: translate(100%, 0);
+                 position: absolute;
+                 top: 0;
+                 bottom: 0;
+                 height: 100%;
+                 width: 100%;
+                 background: #222d32;
+                 color: #fff;
+                 overflow: auto;
+              }
+              .direct-chat-contacts-open .direct-chat-contacts {
+                -webkit-transform: translate(75%, 0);
+                -ms-transform: translate(75%, 0);
+                -o-transform: translate(75%, 0);
+                transform: translate(75%, 0);
+              }
+              </style>
+  <title>Grants View</title>
+  <title>Parent Trust Fund View</title>
+  <title>Additional Information</title>
+  <style>.shinyjs-hide { display: none !important; }</style>
+  <script>Shiny.addCustomMessageHandler('shinyjs-show', function(params) { shinyjs.debugMessage('shinyjs: calling function "show" with parameters:'); shinyjs.debugMessage(params); shinyjs.show(params);});
+Shiny.addCustomMessageHandler('shinyjs-hide', function(params) { shinyjs.debugMessage('shinyjs: calling function "hide" with parameters:'); shinyjs.debugMessage(params); shinyjs.hide(params);});
+Shiny.addCustomMessageHandler('shinyjs-toggle', function(params) { shinyjs.debugMessage('shinyjs: calling function "toggle" with parameters:'); shinyjs.debugMessage(params); shinyjs.toggle(params);});
+Shiny.addCustomMessageHandler('shinyjs-enable', function(params) { shinyjs.debugMessage('shinyjs: calling function "enable" with parameters:'); shinyjs.debugMessage(params); shinyjs.enable(params);});
+Shiny.addCustomMessageHandler('shinyjs-disable', function(params) { shinyjs.debugMessage('shinyjs: calling function "disable" with parameters:'); shinyjs.debugMessage(params); shinyjs.disable(params);});
+Shiny.addCustomMessageHandler('shinyjs-toggleState', function(params) { shinyjs.debugMessage('shinyjs: calling function "toggleState" with parameters:'); shinyjs.debugMessage(params); shinyjs.toggleState(params);});
+Shiny.addCustomMessageHandler('shinyjs-addClass', function(params) { shinyjs.debugMessage('shinyjs: calling function "addClass" with parameters:'); shinyjs.debugMessage(params); shinyjs.addClass(params);});
+Shiny.addCustomMessageHandler('shinyjs-removeClass', function(params) { shinyjs.debugMessage('shinyjs: calling function "removeClass" with parameters:'); shinyjs.debugMessage(params); shinyjs.removeClass(params);});
+Shiny.addCustomMessageHandler('shinyjs-toggleClass', function(params) { shinyjs.debugMessage('shinyjs: calling function "toggleClass" with parameters:'); shinyjs.debugMessage(params); shinyjs.toggleClass(params);});
+Shiny.addCustomMessageHandler('shinyjs-html', function(params) { shinyjs.debugMessage('shinyjs: calling function "html" with parameters:'); shinyjs.debugMessage(params); shinyjs.html(params);});
+Shiny.addCustomMessageHandler('shinyjs-onevent', function(params) { shinyjs.debugMessage('shinyjs: calling function "onevent" with parameters:'); shinyjs.debugMessage(params); shinyjs.onevent(params);});
+Shiny.addCustomMessageHandler('shinyjs-alert', function(params) { shinyjs.debugMessage('shinyjs: calling function "alert" with parameters:'); shinyjs.debugMessage(params); shinyjs.alert(params);});
+Shiny.addCustomMessageHandler('shinyjs-logjs', function(params) { shinyjs.debugMessage('shinyjs: calling function "logjs" with parameters:'); shinyjs.debugMessage(params); shinyjs.logjs(params);});
+Shiny.addCustomMessageHandler('shinyjs-runjs', function(params) { shinyjs.debugMessage('shinyjs: calling function "runjs" with parameters:'); shinyjs.debugMessage(params); shinyjs.runjs(params);});
+Shiny.addCustomMessageHandler('shinyjs-reset', function(params) { shinyjs.debugMessage('shinyjs: calling function "reset" with parameters:'); shinyjs.debugMessage(params); shinyjs.reset(params);});
+Shiny.addCustomMessageHandler('shinyjs-delay', function(params) { shinyjs.debugMessage('shinyjs: calling function "delay" with parameters:'); shinyjs.debugMessage(params); shinyjs.delay(params);});
+Shiny.addCustomMessageHandler('shinyjs-click', function(params) { shinyjs.debugMessage('shinyjs: calling function "click" with parameters:'); shinyjs.debugMessage(params); shinyjs.click(params);});</script>
+  <script src="shinyjs/shinyjs-default-funcs.js"></script>
+  <script>shinyjs.debug = false;</script>
+  <style>.control-sidebar-bg,
+               .control-sidebar {
+                  top: 0;
+                  right: -230px;
+                  width: 230px;
+                  -webkit-transition: right 0.3s ease-in-out;
+                  -o-transition: right 0.3s ease-in-out;
+                  transition: right 0.3s ease-in-out;
+                }
+              </style>
+
+</head>
+
+<body class="hold-transition skin-black sidebar-mini sidebar-collapse" style="min-height: 611px;">
+  <div class="wrapper">
+    <header class="main-header">
+      <span class="logo hidden-xs"></span>
+      <nav class="navbar navbar-static-top" role="navigation">
+        <span style="display:none;">
+          <i class="fa fa-bars"></i>
+        </span>
+        <a href="#" class="sidebar-toggle" data-toggle="offcanvas" role="button">
+          <span class="sr-only">Toggle navigation</span>
+        </a>
+        <div class="navbar-custom-menu" style="float: left; margin-left: 10px;">
+          <ul class="nav navbar-nav"></ul>
+        </div>
+        <div class="navbar-custom-menu">
+          <ul class="nav navbar-nav">
+            <li>
+              <a href="#" data-toggle="control-sidebar">
+                <i class="fa fa-gears"></i>
+              </a>
+            </li>
+          </ul>
+        </div>
+      </nav>
+    </header>
+    <aside id="sidebarCollapsed" class="main-sidebar" data-collapsed="false">
+      <section id="sidebarItemExpanded" class="sidebar">
+        <ul class="sidebar-menu">
+          <li>
+            <a href="#shiny-tab-overview" data-toggle="tab" data-value="overview">
+              <i class="fa fa-dashboard"></i>
+              <span>General Overview</span>
+            </a>
+          </li>
+          <li>
+            <a href="#shiny-tab-regions" data-toggle="tab" data-value="regions">
+              <i class="fa fa-search-plus"></i>
+              <span>Grants Costum View</span>
+            </a>
+          </li>
+          <li>
+            <a href="#shiny-tab-parent_tf" data-toggle="tab" data-value="parent_tf">
+              <i class="fa fa-funnel-dollar"></i>
+              <span>Parent Trust Fund</span>
+            </a>
+          </li>
+          <li>
+            <a href="#shiny-tab-admin_info" data-toggle="tab" data-value="admin_info">
+              <i class="fa fa-info"></i>
+              <span>Additional Info</span>
+            </a>
+          </li>
+          <li>
+            <a href="#shiny-tab-reports" data-toggle="tab" data-value="reports" data-start-selected="1">
+              <i class="fa fa-file-download"></i>
+              <span>Download Reports</span>
+            </a>
+          </li>
+          <div id="nav" class="sidebarMenuSelectedTabItem" data-value="null"></div>
+        </ul>
+      </section>
+    </aside>
+    <div class="content-wrapper">
+      <section class="content">
+        <div class="tab-content">
+          <div role="tabpanel" class="tab-pane" id="shiny-tab-overview" theme="shinythemes/css/readable.min.css">
+            <h2>Global Overview</h2>
+            <div class="row">
+              <div class="col-sm-2">
+                <div class="shiny-html-output col-sm-" id="total_contributions"></div>
+                <div class="shiny-html-output col-sm-" id="total_received"></div>
+                <div class="shiny-html-output col-sm-" id="total_unpaid"></div>
+                <div class="shiny-html-output col-sm-" id="closing&lt;12"></div>
+              </div>
+              <div class="col-sm-4">
+                <div>
+                  <div class="box box-solid bg-blue">
+                    <div class="box-header">
+                      <h3 class="box-title">Grants by Region</h3>
+                      <div class="box-tools pull-right">
+                        <span class="label label-primary"></span>
+                        <button class="btn btn-box-tool" data-widget="collapse">
+                          <i class="fa fa-minus"></i>
+                        </button>
+                      </div>
+                    </div>
+                    <div class="box-body">
+                      <div id="n_grants_region" style="width:100%; height:260px; " class="plotly html-widget html-widget-output shiny-report-size"></div>
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <div class="box box-solid collapsed-box bg-blue">
+                    <div class="box-header">
+                      <h3 class="box-title">Funding by Region</h3>
+                      <div class="box-tools pull-right">
+                        <span class="label label-primary"></span>
+                        <button class="btn btn-box-tool" data-widget="collapse">
+                          <i class="fa fa-plus"></i>
+                        </button>
+                      </div>
+                    </div>
+                    <div class="box-body">
+                      <div id="funding_region" style="width:100%; height:260px; " class="plotly html-widget html-widget-output shiny-report-size"></div>
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <div class="box box-solid collapsed-box bg-blue">
+                    <div class="box-header">
+                      <h3 class="box-title">Funding by Global Practice</h3>
+                      <div class="box-tools pull-right">
+                        <span class="label label-primary"></span>
+                        <button class="btn btn-box-tool" data-widget="collapse">
+                          <i class="fa fa-plus"></i>
+                        </button>
+                      </div>
+                    </div>
+                    <div class="box-body">
+                      <div id="funding_GP" style="width:100%; height:260px; " class="plotly html-widget html-widget-output shiny-report-size"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-sm-6">
+                <div>
+                  <div class="box box-solid bg-blue">
+                    <div class="box-header">
+                      <h3 class="box-title">Active Grants</h3>
+                      <div class="box-tools pull-right">
+                        <span class="label label-primary"></span>
+                        <button class="btn btn-box-tool" data-widget="collapse">
+                          <i class="fa fa-minus"></i>
+                        </button>
+                      </div>
+                    </div>
+                    <div class="box-body">
+                      <div id="elpie" style="width:100%; height:260px; " class="plotly html-widget html-widget-output shiny-report-size"></div>
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <div class="box box-solid bg-blue">
+                    <div class="box-header">
+                      <h3 class="box-title">Contributions by Trustee</h3>
+                      <div class="box-tools pull-right">
+                        <span class="label label-primary"></span>
+                        <button class="btn btn-box-tool" data-widget="collapse">
+                          <i class="fa fa-minus"></i>
+                        </button>
+                      </div>
+                    </div>
+                    <div class="box-body">
+                      <div id="plot1" style="width:100%; height:260px; " class="plotly html-widget html-widget-output shiny-report-size"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="tab-pane active" id="shiny-tab-regions" role="tabpanel">
+            <h2>Grants View</h2>
+            <div class="row">
+              <div class="col-sm-3">
+                <div class="shiny-html-output col-sm-12" id="focal_active_grants"></div>
+                <div class="shiny-html-output col-sm-12" id="focal_active_funds"></div>
+                <div class="shiny-html-output col-sm-6" id="low_risk"></div>
+                <div class="shiny-html-output col-sm-6" id="medium_risk"></div>
+                <div class="shiny-html-output col-sm-6" id="high_risk"></div>
+                <div class="shiny-html-output col-sm-6" id="very_high_risk"></div>
+                <div class="shiny-html-output col-sm-6" id="focal_grants_closing_3"></div>
+                <div class="shiny-html-output col-sm-6" id="focal_grants_active_3_zero_dis"></div>
+                <div class="shiny-html-output col-sm-6" id="region_grants_may_need_transfer"></div>
+                <div class="shiny-html-output col-sm-6" id="region_grants_active_no_transfer"></div>
+              </div>
+              <div class="col-sm-9">
+                <div class="row">
+                  <div class="col-sm-6">
+                    <div class="box box-solid bg-navy">
+                      <div class="box-header">
+                        <h3 class="box-title">Funds Summary</h3>
+                        <div class="box-tools pull-right">
+                          <span class="label label-primary"></span>
+                          <button class="btn btn-box-tool" data-widget="collapse">
+                            <i class="fa fa-minus"></i>
+                          </button>
+                        </div>
+                      </div>
+                      <div class="box-body">
+                        <div id="elpie2" style="width:100%; height:260px; " class="plotly html-widget html-widget-output shiny-report-size"></div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="col-sm-6">
+                    <div class="box box-solid bg-navy">
+                      <div class="box-header">
+                        <h3 class="box-title">Funding by GP/Global Theme</h3>
+                        <div class="box-tools pull-right">
+                          <span class="label label-primary"></span>
+                          <button class="btn btn-box-tool" data-widget="collapse">
+                            <i class="fa fa-minus"></i>
+                          </button>
+                        </div>
+                      </div>
+                      <div class="box-body">
+                        <div id="region_GP_GG" style="width:100%; height:260px; " class="plotly html-widget html-widget-output shiny-report-size"></div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="col-sm-12">
+                    <div class="box box-solid bg-navy">
+                      <div class="box-header">
+                        <h3 class="box-title">Grants Disbursement Risk</h3>
+                        <div class="box-tools pull-right">
+                          <span class="label label-primary"></span>
+                          <button class="btn btn-box-tool" data-widget="collapse">
+                            <i class="fa fa-minus"></i>
+                          </button>
+                        </div>
+                      </div>
+                      <div class="box-body">
+                        <div id="disbursement_risk_GG" style="width:100%; height:260px; " class="plotly html-widget html-widget-output shiny-report-size"></div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="col-sm-12">
+                    <div class="box box-solid bg-navy">
+                      <div class="box-header">
+                        <h3 class="box-title">Active Grants by Trustee</h3>
+                        <div class="box-tools pull-right">
+                          <span class="label label-primary"></span>
+                          <button class="btn btn-box-tool" data-widget="collapse">
+                            <i class="fa fa-minus"></i>
+                          </button>
+                        </div>
+                      </div>
+                      <div class="box-body">
+                        <div id="focal_region_n_grants_GG" style="width:100%; height:260px; " class="plotly html-widget html-widget-output shiny-report-size"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="row">
+                <div class="col-sm-12">
+                  <div class="box box-solid collapsed-box">
+                    <div class="box-header">
+                      <h3 class="box-title">Summary Table</h3>
+                      <div class="box-tools pull-right">
+                        <span class="label label-primary"></span>
+                        <button class="btn btn-box-tool" data-widget="collapse">
+                          <i class="fa fa-plus"></i>
+                        </button>
+                      </div>
+                    </div>
+                    <div class="box-body">
+                      <div id="region_summary_grants_table" style="width:100%; height:auto; " class="datatables html-widget html-widget-output"></div>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-sm-12">
+                  <div class="box box-solid collapsed-box">
+                    <div class="box-header">
+                      <h3 class="box-title">Countries Summary Table</h3>
+                      <div class="box-tools pull-right">
+                        <span class="label label-primary"></span>
+                        <button class="btn btn-box-tool" data-widget="collapse">
+                          <i class="fa fa-plus"></i>
+                        </button>
+                      </div>
+                    </div>
+                    <div class="box-body">
+                      <div id="region_countries_grants_table" style="width:100%; height:auto; " class="datatables html-widget html-widget-output"></div>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-sm-12">
+                  <div class="box box-solid collapsed-box">
+                    <div class="box-header">
+                      <h3 class="box-title">Funding source table</h3>
+                      <div class="box-tools pull-right">
+                        <span class="label label-primary"></span>
+                        <button class="btn btn-box-tool" data-widget="collapse">
+                          <i class="fa fa-plus"></i>
+                        </button>
+                      </div>
+                    </div>
+                    <div class="box-body">
+                      <div id="region_funding_source_grants_table" style="width:100%; height:auto; " class="datatables html-widget html-widget-output"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div role="tabpanel" class="tab-pane" id="shiny-tab-parent_tf">
+            <h2>Parent Trust Fund View</h2>
+            <div class="row">
+              <div class="col-sm-3">
+                <div>
+                  <div class="box box-solid bg-navy">
+                    <div class="box-body">
+                      <div id="trustee_name" class="shiny-text-output"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-sm-9">
+                <div class="col-sm-6">
+                  <div class="box box-solid bg-navy">
+                    <div class="box-body">
+                      <div id="trustee_contribution_agency" class="shiny-text-output"></div>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-sm-6">
+                  <div class="box box-solid bg-navy">
+                    <div class="box-body">
+                      <div id="TTL_name" class="shiny-text-output"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="row">
+              <div class="col-sm-3">
+                <div class="shiny-html-output col-sm-" id="fund_contributions"></div>
+                <div class="shiny-html-output col-sm-" id="trustee_closing_in_months"></div>
+                <div class="shiny-html-output col-sm-" id="trustee_active_grants"></div>
+                <div class="shiny-html-output col-sm-" id="trustee_grants_closing_3"></div>
+              </div>
+              <div class="col-sm-9">
+                <div class="col-sm-6">
+                  <div class="box box-solid bg-blue">
+                    <div class="box-header">
+                      <h3 class="box-title">Contributions</h3>
+                      <div class="box-tools pull-right">
+                        <span class="label label-primary"></span>
+                        <button class="btn btn-box-tool" data-widget="collapse">
+                          <i class="fa fa-minus"></i>
+                        </button>
+                      </div>
+                    </div>
+                    <div class="box-body">
+                      <div id="trustee_received_unpaid_pie" style="width:100%; height:260px; " class="plotly html-widget html-widget-output shiny-report-size"></div>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-sm-6">
+                  <div class="box box-solid bg-blue">
+                    <div class="box-header">
+                      <h3 class="box-title">Disbursement Summary</h3>
+                      <div class="box-tools pull-right">
+                        <span class="label label-primary"></span>
+                        <button class="btn btn-box-tool" data-widget="collapse">
+                          <i class="fa fa-minus"></i>
+                        </button>
+                      </div>
+                    </div>
+                    <div class="box-body">
+                      <div id="trustee_dis_GG" style="width:100%; height:260px; " class="plotly html-widget html-widget-output shiny-report-size"></div>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-sm-6">
+                  <div class="box box-solid bg-blue">
+                    <div class="box-header">
+                      <h3 class="box-title">Grants by Region</h3>
+                      <div class="box-tools pull-right">
+                        <span class="label label-primary"></span>
+                        <button class="btn btn-box-tool" data-widget="collapse">
+                          <i class="fa fa-minus"></i>
+                        </button>
+                      </div>
+                    </div>
+                    <div class="box-body">
+                      <div id="trustee_region_n_grants_GG" style="width:100%; height:260px; " class="plotly html-widget html-widget-output shiny-report-size"></div>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-sm-6">
+                  <div class="box box-solid bg-blue">
+                    <div class="box-header">
+                      <h3 class="box-title">Funding per Region</h3>
+                      <div class="box-tools pull-right">
+                        <span class="label label-primary"></span>
+                        <button class="btn btn-box-tool" data-widget="collapse">
+                          <i class="fa fa-minus"></i>
+                        </button>
+                      </div>
+                    </div>
+                    <div class="box-body">
+                      <div id="trustee_region_GG" style="width:100%; height:260px; " class="plotly html-widget html-widget-output shiny-report-size"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="row">
+              <div class="col-sm-12">
+                <div class="box box-solid bg-blue">
+                  <div class="box-body">
+                    <div>
+                      <div class="box box-solid collapsed-box">
+                        <div class="box-header">
+                          <h3 class="box-title">Country Summary Table</h3>
+                          <div class="box-tools pull-right">
+                            <span class="label label-primary"></span>
+                            <button class="btn btn-box-tool" data-widget="collapse">
+                              <i class="fa fa-plus"></i>
+                            </button>
+                          </div>
+                        </div>
+                        <div class="box-body">
+                          <div id="trustee_countries_DT" style="width:100%; height:auto; " class="datatables html-widget html-widget-output"></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div role="tabpanel" class="tab-pane" id="shiny-tab-admin_info">
+            <h2>Additional Information</h2>
+            <div class="tabbable">
+              <ul class="nav nav-pills" data-tabsetid="5408">
+                <li class="active">
+                  <a href="#tab-5408-1" data-toggle="tab" data-value="Trustee Info">Trustee Info</a>
+                </li>
+                <li>
+                  <a href="#tab-5408-2" data-toggle="tab" data-value="Donor Contributions">Donor Contributions</a>
+                </li>
+                <li>
+                  <a href="#tab-5408-3" data-toggle="tab" data-value="RETF grants overview">RETF grants overview</a>
+                </li>
+              </ul>
+              <div class="tab-content" data-tabsetid="5408">
+                <div class="tab-pane active" data-value="Trustee Info" id="tab-5408-1">
+                  <div id="trustee_name_TTL" class="shiny-html-output"></div>
+                </div>
+                <div class="tab-pane" data-value="Donor Contributions" id="tab-5408-2">
+                  <div id="donor_contributions" class="shiny-html-output"></div>
+                  <div id="donor_contributions_GG" style="width:100%; height:400px; " class="plotly html-widget html-widget-output shiny-report-size"></div>
+                </div>
+                <div class="tab-pane" data-value="RETF grants overview" id="tab-5408-3">
+                  <div class="row">
+                    <div class="shiny-html-output col-sm-4" id="RETF_n_grants_A"></div>
+                    <div class="shiny-html-output col-sm-4" id="RETF_$_grants_A"></div>
+                  </div>
+                  <div class="container-fluid">
+                    <div class="tabbable">
+                      <ul class="nav nav-tabs" data-tabsetid="8424">
+                        <li class="active">
+                          <a href="#tab-8424-1" data-toggle="tab" data-value="Trustees">Trustees</a>
+                        </li>
+                        <li>
+                          <a href="#tab-8424-2" data-toggle="tab" data-value="Regions">Regions</a>
+                        </li>
+                      </ul>
+                      <div class="tab-content" data-tabsetid="8424">
+                        <div class="tab-pane active" data-value="Trustees" id="tab-8424-1">
+                          <div id="RETF_trustees_A_pie" style="width:100%; height:450px; " class="plotly html-widget html-widget-output shiny-report-size"></div>
+                        </div>
+                        <div class="tab-pane" data-value="Regions" id="tab-8424-2">
+                          <div id="RETF_region_A_pie" style="width:100%; height:450px; " class="plotly html-widget html-widget-output shiny-report-size"></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div role="tabpanel" class="tab-pane" id="shiny-tab-reports">
+            <h1>Download Reports</h1>
+            <div class="row">
+              <div class="col-sm-3">
+                <div class="form-group shiny-input-container">
+                  <label class="control-label shiny-label-null" for="report_type"></label>
+                  <div>
+                    <select id="report_type"><option value="Summary Report" selected>Summary Report</option>
+<option value="Disbursement Risk Report">Disbursement Risk Report</option>
+<option value="Sameh Report">Sameh Report</option></select>
+                    <script type="application/json" data-for="report_type" data-nonempty="">{}</script>
+                  </div>
+                </div>
+              </div>
+              <div class="col-sm-4">
+                <div data-display-if="input.report_type == &#39;Summary Report&#39;" data-ns-prefix="">
+                  <div class="pad box-pane-right bg-blue">
+                    <div class="form-group shiny-input-container">
+                      <label class="control-label" for="summary_fund_status">Child Fund Status:</label>
+                      <div>
+                        <select id="summary_fund_status" multiple="multiple"><option value="ACTV" selected>ACTV</option>
+<option value="PEND" selected>PEND</option></select>
+                        <script type="application/json" data-for="summary_fund_status">{}</script>
+                      </div>
+                    </div>
+                    <div class="form-group shiny-input-container">
+                      <label class="control-label" for="summary_region">Region Name(s):</label>
+                      <div>
+                        <select id="summary_region" multiple="multiple"><option value="AFR" selected>AFR</option>
+<option value="EAP" selected>EAP</option>
+<option value="ECA" selected>ECA</option>
+<option value="GLOBAL" selected>GLOBAL</option>
+<option value="LCR" selected>LCR</option>
+<option value="MNA" selected>MNA</option>
+<option value="SAR" selected>SAR</option></select>
+                        <script type="application/json" data-for="summary_region">{}</script>
+                      </div>
+                    </div>
+                    <div class="form-group shiny-input-container">
+                      <label class="control-label" for="summary_trustee">Trustee(s):</label>
+                      <div>
+                        <select id="summary_trustee" multiple="multiple"><option value="ACP-EU NDRR" selected>ACP-EU NDRR</option>
+<option value="Canada-Caribbean SDTF" selected>Canada-Caribbean SDTF</option>
+<option value="Core MDTF" selected>Core MDTF</option>
+<option value="CRP MDTF" selected>CRP MDTF</option>
+<option value="DFAT SDTF" selected>DFAT SDTF</option>
+<option value="EU-ADRF" selected>EU-ADRF</option>
+<option value="EU-Caribbean OCTs" selected>EU-Caribbean OCTs</option>
+<option value="EU-Caribbean RRB" selected>EU-Caribbean RRB</option>
+<option value="EU-DRFA" selected>EU-DRFA</option>
+<option value="EU-SAR" selected>EU-SAR</option>
+<option value="EU - Central Asia" selected>EU - Central Asia</option>
+<option value="GRiF MDTF" selected>GRiF MDTF</option>
+<option value="Japan Program Phase I SDTF" selected>Japan Program Phase I SDTF</option>
+<option value="Japan Program Phase II SDTF" selected>Japan Program Phase II SDTF</option>
+<option value="Parallel MDTF" selected>Parallel MDTF</option>
+<option value="Serbia-DRM SDTF" selected>Serbia-DRM SDTF</option>
+<option value="USAID SDTF" selected>USAID SDTF</option></select>
+                        <script type="application/json" data-for="summary_trustee">{}</script>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <a id="Download_selected_report" class="btn btn-default shiny-download-link " href="" target="_blank" download>
+                <i class="fa fa-download"></i>
+                Download
+              </a>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+    <div id="controlbar">
+      <aside class="control-sidebar control-sidebar-dark" style="width: 230px;">
+        <ul class="nav nav-tabs nav-justified control-sidebar-tabs">
+          <li>
+            <a href="#control-sidebar-side_bar-tab" data-toggle="tab">
+              <i class="fa fa-"></i>
+            </a>
+          </li>
+        </ul>
+        <div class="controlbar tab-content" title="Right Sidebar">
+          <div id="side_bar" class="shiny-html-output"></div>
+        </div>
+      </aside>
+      <div class="control-sidebar-bg" style="width: 230px;"></div>
+    </div>
+  </div>
+</body>
+
+</html>

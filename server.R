@@ -197,6 +197,12 @@ server <- shinyServer(function(input,output,session) {
       
       
       })
+  
+  
+  output$pledged <- renderText({
+    sum(active_trustee$`Net Signed Condribution in USD`) %>%
+      dollar(accuracy = 1) %>% as.character()
+  })
     
     output$total_contributions <- renderValueBox({
       sum(active_trustee$`Net Signed Condribution in USD`) %>%
@@ -204,7 +210,7 @@ server <- shinyServer(function(input,output,session) {
       valueBox(value=tags$p(., style = "font-size: 60%;"),
                icon = icon("money-check-alt"),
                color = "navy",
-               subtitle = "Total Pledged")
+               subtitle = "Total Pledged (Across Active Trustees)")
       })
     
     output$total_received <- renderValueBox({
@@ -229,7 +235,7 @@ server <- shinyServer(function(input,output,session) {
         dollar(accuracy = 1) %>% 
         valueBox(
           value= tags$p(., style = "font-size: 60%;"), icon = icon("file-invoice-dollar"),
-          color = "light-blue", subtitle = "Active Portfolio")
+          color = "light-blue", subtitle = "Active Portfolio Amount")
       
     })
     
@@ -238,7 +244,7 @@ server <- shinyServer(function(input,output,session) {
         dollar(accuracy = 1) %>% 
         valueBox(
           value= tags$p(., style = "font-size: 60%;"), icon = icon("file-invoice-dollar"),
-          color = "light-blue", subtitle = "Uncommitted Balance in Active Portfolio")
+          color = "light-blue", subtitle = "Available Balance in Active Portfolio")
       
     })
 
@@ -917,14 +923,21 @@ server <- shinyServer(function(input,output,session) {
         
         temp_active_trustee <- reactive_active_trustee()
   
-        paste0(temp_active_trustee$temp.name,collapse ="; " )
+        paste0(paste0(temp_active_trustee$temp.name," (",temp_active_trustee$Fund,")"),collapse ="; " )
       })
   
-      output$fund_contributions <- renderValueBox({
+      output$fund_balance <- renderValueBox({
         
         temp_active_trustee <- reactive_active_trustee()
-        sum(temp_active_trustee$`Net Signed Condribution in USD`) %>% dollar %>% 
-          valueBox(subtitle = "Total Funds",value=tags$p(., style = "font-size: 85%;"),color = "blue",icon = icon("money-check-alt"))
+        
+        s_title <- ifelse(nrow(temp_active_trustee)>1,
+                          "Sum of Balance Across Selected Parent Funds",
+                          "Parent Fund Balance")
+        
+        sum(temp_active_trustee$`Available Balance USD`,
+            temp_active_trustee$`Net Unpaid contribution in USD`) %>%
+          dollar %>% 
+          valueBox(subtitle = s_title,value=tags$p(., style = "font-size: 85%;"),color = "blue",icon = icon("money-check-alt"))
       })
       
       
@@ -932,8 +945,8 @@ server <- shinyServer(function(input,output,session) {
         
         temp_df <- reactive_active_trustee()
         temp_df <- temp_df %>% 
-          summarise("Paid-In" = round(sum(`Net Paid-In Condribution in USD`)),
-                    "Unpaid" = round(sum(`Net Unpaid contribution in USD`))) %>%
+          summarise("Available" = round(sum(`Available Balance USD`)),
+                    "Un-paid" = round(sum(`Net Unpaid contribution in USD`))) %>%
           reshape2::melt()
         
         temp_df$Percent <- temp_df$value/sum(temp_df$value)
@@ -954,7 +967,7 @@ server <- shinyServer(function(input,output,session) {
         plot_ly() %>%
           add_pie(
             data = temp_df,
-            title="Contributions",
+            title="Balance",
             labels=~variable,
             values = ~value,
             textinfo= 'text',
@@ -1025,7 +1038,7 @@ server <- shinyServer(function(input,output,session) {
       output$trustee_active_grants <- renderValueBox({
         temp_grants <- reactive_grants_trustee()
         temp_grants %>% select(Fund)%>% dplyr::distinct() %>% nrow() %>% 
-          valueBox(subtitle = show_grant_button("Active portfolio ",
+          valueBox(subtitle = show_grant_button("Grants in active portfolio",
                                                 "show_active_grants_trustee"),
                    value=.,
                    color = "light-blue")

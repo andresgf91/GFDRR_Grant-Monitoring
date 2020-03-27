@@ -49,16 +49,12 @@ Header <- dashboardHeaderPlus(title=
 ## Sidebar ---------------
 
     
-secretariat_view <-   # menuItem("Secretariat View",icon = icon("dashboard"),
-                       menuItem("Portfolio Overview",
+secretariat_view <-   menuItem("Portfolio Overview",
                                 tabName = "overview",
                                 icon = icon("dashboard"),
                                 selected = T)
-                       #,
-info <-             #menuSubItem("PMA",
-                              #  tabName = "PMA",
-                              #  icon = icon("stream")),
-                    menuItem("Additional Information",
+                      
+info <- menuItem("Additional Information",
                              tabName = "admin_info",
                              icon = icon("info"))
 
@@ -101,6 +97,17 @@ tab.1 <-  tabItem(tabName = "overview",
                     fluidRow(
                       column(
                         width = 2,
+                        # boxPlus(title=textOutput("pledged"),
+                        #         paste(" Total Pledged (Across Active Trustees)","                              ."),
+                        #         width = NULL,
+                        #         status = "navy",
+                        #         background = "navy",
+                        #         closable = F,
+                        #         collapsible = T,
+                        #         height = 150,
+                        #         enable_sidebar = T,
+                        #         sidebar_content = "text bla bababab baBABAB ABBABA ",
+                        #         sidebar_width = 100),
                         valueBoxOutput("total_contributions", width = NULL),
                         valueBoxOutput("total_received", width = NULL),
                         valueBoxOutput("total_unpaid", width = NULL),
@@ -168,13 +175,7 @@ tab.1 <-  tabItem(tabName = "overview",
                         #plotlyOutput("overview_progress_GG", height = 90)),
                       )
                     )
-                           # valueBoxOutput("number_active_grants_op", width = 5),
-                             # infoBoxOutput("total_remaining_balance_op", width = 7),
-                           # plotlyOutput("overview_progress_GG_op"),
-                             # valueBoxOutput("number_active_grants_pma", width = 5),
-                             # infoBoxOutput("total_remaining_balance_pma", width = 7),
-                    
-                      #plotlyOutput("overview_progress_GG_pma"),
+                          
                     
                     
     )
@@ -230,7 +231,7 @@ tab.2 <- tabItem(tabName= "parent_tf",fluidPage(
                      background = "navy"))),
                  fluidRow(
                    column(width=3,
-                 valueBoxOutput("fund_contributions", width = NULL),
+                 valueBoxOutput("fund_balance", width = NULL),
                  valueBoxOutput("trustee_closing_in_months",width = NULL),
                  valueBoxOutput("trustee_active_grants",width = NULL),
                  valueBoxOutput("trustee_grants_closing_3",width = NULL)
@@ -238,7 +239,7 @@ tab.2 <- tabItem(tabName= "parent_tf",fluidPage(
                  column(width=9,
                         boxPlus(
                           plotlyOutput("trustee_received_unpaid_pie", height = 260),
-                          title='Contributions',
+                          title='Parent Fund(s) Balance',
                           background = "blue",
                           enable_label = T,
                           label_text = NULL,
@@ -247,7 +248,7 @@ tab.2 <- tabItem(tabName= "parent_tf",fluidPage(
                           closable = F),
                         boxPlus(
                           plotlyOutput("trustee_dis_GG", height = 260),
-                          title='Disbursement Summary',
+                          title='Active Portfolio Disbursement Summary',
                           background = "blue",
                           enable_label = T,
                           label_text = NULL,
@@ -392,42 +393,9 @@ tab.3 <-  tabItem(tabName = "regions",
                                   closable = F,
                                   collapsed = T)
                             )
-                            
-                      #,
-                     #fluidRow(
-                        #plotlyOutput("region_remaining_committed_disbursed", height = 100),
-                       # plotlyOutput(outputId = "region_GP_GG", width = 1200,height=500)),
-                           # ,
-                       #     fluidRow(column(3,offset = 1,
-                      #                      downloadButton("generate_risk_report",
-                      #                     "Download Excel Report"))),
-                          #dateInput(
-                          #  "summary_table_cutoff_date",
-                          #  "Grants that need to be implemented by:",
-                         #   value = grants$`Closing Date`[which.max(grants$`Closing Date`)] %>%
-                         #     lubridate::as_date(),
-                         #   autoclose = TRUE
-                        #  ),
-                         
-                      #    fluidRow(column(3,offset = 1,
-                      #                    downloadButton("generate_full_excel_report_1",
-                       #                                "Open test version excel Report"))
-                      #    )
-                       # ,
-                       #   fluidRow(column(3,offset = 1,
-                        #                  downloadButton("generate_full_excel_report_2",
-                        #                               "Open test version excel Report"))
-                        #  ),
-                        
-                          #plotlyOutput(outputId = "focal_region_n_grants_GG"),
-
-                          #fluidRow(column(3,offset = 1,
-                           #               downloadButton("generate_full_excel_report_3",
-                                               #        "Open draft excel Report"))
+                          
                           ))
                   
-
-#tabPanel(title="RETF")
 
 ## tab.4 (PMA View) ---------------
 
@@ -619,8 +587,11 @@ tags$head(tags$style(HTML('
     
     .wrapper{
     overflow-y: hidden;
+}
 
-
+#pledged{color: white;
+font-size: 22px;
+font-style: italic;
 
 
 }
